@@ -1,0 +1,22 @@
+# 本地开发环境
+# 用法：docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+name: personal_milestone_dev
+
+services:
+  mysql:
+    image: docker.m.daocloud.io/library/mysql:8.4
+    container_name: personal_milestone_mysql_dev
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: personal_milestone
+      MYSQL_USER: milestone
+      MYSQL_PASSWORD: milestone
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]

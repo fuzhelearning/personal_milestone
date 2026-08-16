@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+config/live.yaml
+.idea/
+*.db
+.DS_Store

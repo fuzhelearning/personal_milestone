@@ -1,0 +1,11 @@
+# 本地开发配置（可提交）
+# 启动：APP_ENV=dev uvicorn main:app --reload --port 8000
+
+app_env: dev
+database_url: mysql+pymysql://root:root@127.0.0.1:3306/personal_milestone
+jwt_secret: dev-change-me
+jwt_expire_seconds: 7200
+llm_mode: mock
+internal_token: dev-internal-token
+wechat_mock: true
+enable_docs: true

@@ -1,0 +1,16 @@
+# 公共基础；需与环境文件叠用：
+#   本地：docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#   线上：docker compose -f docker-compose.yml -f docker-compose.live.yml up -d
+
+services:
+  mysql:
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  mysql_data:

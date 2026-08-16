@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Personal Milestone — Home Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f3f6f2;
+      --bg-elev: #ffffff;
+      --ink: #1a2420;
+      --muted: #5c6b63;
+      --line: #d5e0d8;
+      --accent: #1f6b4a;
+      --accent-soft: #e5f3ec;
+      --accent-deep: #145239;
+      --danger-soft: #f4ebe6;
+      --warn: #8a5a3a;
+      --radius: 18px;
+      --shadow: 0 18px 50px rgba(26, 36, 32, 0.08);
+      --phone-w: 390px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #dceadf 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #e8efe4 0%, transparent 45%),
+        linear-gradient(180deg, #eef3ec 0%, var(--bg) 40%, #e7eee8 100%);
+    }
+
+    .stage {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px 16px 48px;
+      gap: 20px;
+    }
+
+    .hint {
+      max-width: var(--phone-w);
+      width: 100%;
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .phone {
+      width: min(100%, var(--phone-w));
+      min-height: 780px;
+      background: var(--bg-elev);
+      border-radius: 36px;
+      box-shadow: var(--shadow), inset 0 0 0 1px rgba(255,255,255,0.7);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 110px;
+      height: 28px;
+      background: #111;
+      border-radius: 20px;
+      z-index: 2;
+    }
+
+    .scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 52px 20px 28px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 22px;
+      animation: rise 0.55s ease both;
+    }
+
+    .date-label {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 4px;
+    }
+
+    .date-main {
+      font-family: "Fraunces", Georgia, serif;
+      font-size: 26px;
+      font-weight: 600;
+      line-height: 1.15;
+      margin: 0;
+    }
+
+    .plus {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 14px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(31, 107, 74, 0.28);
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .plus:hover { background: var(--accent-deep); }
+    .plus:active { transform: scale(0.96); }
+
+    .card {
+      background: #fbfcfb;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+      animation: rise 0.55s ease both;
+    }
+    .card.clickable {
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .card.clickable:active {
+      transform: scale(0.985);
+      border-color: #b9d0c2;
+      box-shadow: 0 10px 28px rgba(26, 36, 32, 0.08);
+    }
+    .card-foot {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #e2eae5;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-deep);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .view { display: none; flex: 1; flex-direction: column; min-height: 0; }
+    .view.active { display: flex; }
+    .nav-back {
+      border: none;
+      background: transparent;
+      font: inherit;
+      font-weight: 700;
+      color: var(--accent-deep);
+      padding: 0;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    .goal-block {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .goal-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .goal-row:active { background: #f7faf8; }
+    .chev {
+      width: 20px;
+      color: var(--muted);
+      font-weight: 700;
+      transition: transform 0.2s ease;
+    }
+    .goal-block.open .chev { transform: rotate(90deg); }
+    .goal-meta { flex: 1; min-width: 0; }
+    .goal-meta h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .goal-meta p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .ms-wrap {
+      display: none;
+      border-top: 1px solid #eef2ef;
+      padding: 8px 10px 12px;
+      background: #fbfcfb;
+    }
+    .goal-block.open .ms-wrap { display: block; }
+    .ms-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      margin: 10px 0 6px;
+    }
+    .current-ms {
+      margin: 4px 0 10px;
+      padding: 12px 12px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #e8f5ee 0%, #f4faf7 100%);
+      border: 1px solid #cfe5d8;
+    }
+    .current-ms .eyebrow {
+      margin: 0 0 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--accent-deep);
+      text-transform: uppercase;
+    }
+    .current-ms h4 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .current-ms p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .gantt tr.ms-current-row td.row-label {
+      background: #eef8f2;
+    }
+    .gantt-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      -webkit-overflow-scrolling: touch;
+    }
+    .gantt {
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 100%;
+      font-size: 11px;
+    }
+    .gantt th, .gantt td {
+      border-right: 1px solid #eef2ef;
+      border-bottom: 1px solid #eef2ef;
+      padding: 0;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .gantt th {
+      background: #f5f8f6;
+      padding: 8px 4px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .gantt .row-label {
+      text-align: left;
+      padding: 10px 8px;
+      min-width: 88px;
+      max-width: 88px;
+      width: 88px;
+      font-weight: 600;
+      font-size: 12px;
+      background: #fff;
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      box-shadow: 1px 0 0 #eef2ef;
+    }
+    .gantt th.row-label { z-index: 3; background: #f5f8f6; }
+    .gantt th.is-today {
+      color: var(--accent-deep);
+      background: #e8f5ee;
+      font-size: 10px;
+      line-height: 1.25;
+      padding: 6px 2px;
+    }
+    .gantt .cell {
+      width: 34px;
+      min-width: 34px;
+      height: 34px;
+      vertical-align: middle;
+    }
+    .gantt .cell.is-today { background: #f3faf6; }
+    .gantt .cell .dot {
+      width: 20px;
+      height: 20px;
+      margin: 0 auto;
+      border-radius: 6px;
+      background: #eef2ef;
+    }
+    .gantt .cell.planned .dot { background: #d9e6de; }
+    .gantt .cell.done .dot {
+      background: linear-gradient(145deg, #2a8f62, var(--accent));
+    }
+    .gantt .cell.not_done .dot {
+      background: #f3d9c8;
+      box-shadow: inset 0 0 0 2px #c47a4a;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      margin: 12px 0 4px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .legend i {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      margin-right: 4px;
+      vertical-align: -2px;
+    }
+    .legend .l-done { background: var(--accent); }
+    .legend .l-pending { background: #d9e6de; }
+    .legend .l-miss { background: #f3d9c8; box-shadow: inset 0 0 0 1px #c47a4a; }
+    .legend .l-empty { background: #eef2ef; }
+
+    .card-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .badge {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-deep);
+      background: var(--accent-soft);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .node {
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+    }
+    .node + .node { border-top: 1px solid #ebf0ec; }
+    .node.child { padding-left: 8px; }
+    .code {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .node-title {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pct {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-deep);
+      min-width: 36px;
+      text-align: right;
+    }
+    .bar {
+      grid-column: 2 / 4;
+      height: 7px;
+      background: #e7eee9;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: -2px;
+    }
+    .bar > i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #2a8f62, var(--accent));
+      border-radius: inherit;
+      transition: width 0.45s cubic-bezier(.2,.8,.2,1), background 0.3s ease;
+    }
+    .task {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      margin-bottom: 10px;
+      overflow: hidden;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .task.expanded {
+      border-color: #c9ddd1;
+      box-shadow: 0 8px 24px rgba(26, 36, 32, 0.06);
+    }
+    .task-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .check {
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+      border: 2px solid #b7c8be;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .task.done .check {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .task.done .task-name {
+      color: var(--muted);
+    }
+    .task-name {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+    .chip {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--warn);
+      background: var(--danger-soft);
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    .expand {
+      display: none;
+      padding: 0 14px 14px;
+      border-top: 1px dashed #e2eae5;
+    }
+    .task.expanded .expand {
+      display: block;
+      padding-top: 12px;
+    }
+    .expand label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .expand textarea {
+      width: 100%;
+      min-height: 72px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+      font-size: 14px;
+      outline: none;
+      background: #fafcfb;
+      color: var(--ink);
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+    .expand textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(31, 107, 74, 0.12);
+    }
+    .task.done .expand textarea,
+    .expand textarea:disabled {
+      background: #eef1ef;
+      color: #9aa69f;
+      border-color: #e0e6e2;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .task.done .expand label {
+      color: #9aa69f;
+    }
+    .submit {
+      width: 100%;
+      margin-top: 10px;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font: inherit;
+      font-weight: 700;
+      color: #fff;
+      background: var(--accent-deep);
+      cursor: pointer;
+    }
+    .submit:disabled {
+      background: #b7c4bc;
+      cursor: not-allowed;
+    }
+    .submit:active:not(:disabled) { transform: scale(0.99); }
+    .week-day {
+      margin-bottom: 12px;
+    }
+    .week-day h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .week-item {
+      font-size: 13px;
+      padding: 8px 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+
+    .toast {
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      bottom: 24px;
+      background: var(--ink);
+      color: #fff;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      transform: translateY(120%);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 5;
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .modal {
+      position: absolute;
+      inset: 0;
+      background: rgba(18, 28, 24, 0.42);
+      display: none;
+      align-items: flex-end;
+      z-index: 6;
+    }
+    .modal.show { display: flex; }
+    .sheet {
+      width: 100%;
+      background: #fff;
+      border-radius: 24px 24px 0 0;
+      padding: 20px 20px 28px;
+      animation: sheetUp 0.28s ease;
+    }
+    .sheet h3 {
+      font-family: "Fraunces", Georgia, serif;
+      margin: 0 0 6px;
+      font-size: 22px;
+    }
+    .sheet p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .field {
+      margin-bottom: 12px;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input, .field textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 11px 12px;
+      font: inherit;
+      font-size: 14px;
+      outline: none;
+    }
+    .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .sheet-actions {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .ghost {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .week-card.collapsed .week-body { display: none; }
+    .week-card .card-head {
+      cursor: pointer;
+      user-select: none;
+    }
+    .week-card .card-head .chev-week {
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+    .goal-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .rule-hint {
+      margin: 0 0 12px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      background: #f5f8f6;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes sheetUp {
+      from { transform: translateY(24px); opacity: 0.6; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <p class="hint">
+      点 <strong>Structure 目标</strong>＝改完成日/备注并重排<br />
+      今日/本周＝全目标合并 · 本周默认折叠 · 底部进甘特
+    </p>
+
+    <div class="phone" id="phone">
+      <div class="view active" id="viewHome">
+        <div class="scroll">
+          <header class="topbar">
+            <div>
+              <p class="date-label">Today</p>
+              <h1 class="date-main" id="dateMain">Sunday, August 2, 2026</h1>
+            </div>
+            <button class="plus" id="plusBtn" type="button" aria-label="新建目标">+</button>
+          </header>
+
+          <section class="card" aria-label="Structure">
+            <div class="card-head">
+              <h2 class="card-title">Structure</h2>
+              <span class="badge">多目标</span>
+            </div>
+            <div id="structure"></div>
+            <div class="card-foot clickable" id="openGantt" style="cursor:pointer">
+              <span>查看全局甘特图（目标→里程碑→每日格）</span>
+              <span>›</span>
+            </div>
+          </section>
+
+          <section class="card" aria-label="今日任务">
+            <div class="card-head">
+              <h2 class="card-title">今日任务</h2>
+              <span class="badge" id="leftCount">全目标</span>
+            </div>
+            <div id="todayTasks"></div>
+          </section>
+
+          <section class="card week-card collapsed" id="weekCard" aria-label="本周剩余">
+            <div class="card-head" id="weekToggle">
+              <h2 class="card-title">本周剩余 <span class="chev-week" id="weekChev">›</span></h2>
+              <span class="badge" id="weekBadge">点击展开</span>
+            </div>
+            <div class="week-body" id="restWeek"></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="view" id="viewGantt">
+        <div class="scroll">
+          <button class="nav-back" id="backHome" type="button">‹ 返回首页</button>
+          <header class="topbar" style="margin-bottom:12px">
+            <div>
+              <p class="date-label">Gantt</p>
+              <h1 class="date-main" style="font-size:22px">每日进度</h1>
+            </div>
+          </header>
+          <p style="margin:0 0 8px;font-size:13px;color:var(--muted);line-height:1.45">
+            日期轴 today±30，进入以今天居中。同里程碑同日若有多任务，须<strong>全部完成</strong>该格才不显示「未完成」色。
+          </p>
+          <p id="ganttWindowHint" style="margin:0 0 8px;font-size:12px;color:var(--muted)"></p>
+          <div class="legend">
+            <span><i class="l-done"></i>已全部完成（≤今天）</span>
+            <span><i class="l-miss"></i>有未完成（≤今天，含未全勾完）</span>
+            <span><i class="l-pending"></i>未开始（今天之后有安排）</span>
+            <span><i class="l-empty"></i>无安排</span>
+          </div>
+          <div id="ganttList"></div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast"></div>
+
+      <div class="modal" id="modal">
+        <div class="sheet">
+          <h3>新建目标</h3>
+          <p>对应首页「+」：名称、起止日、备注 → 后端异步生成 WBS</p>
+          <div class="field">
+            <label>目标名称</label>
+            <input id="fTitle" value="通过看书学会 agent" />
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>计划开始</label>
+              <input id="fStart" type="date" value="2026-08-02" />
+            </div>
+            <div class="field">
+              <label>计划结束</label>
+              <input id="fEnd" type="date" value="2026-09-05" />
+            </div>
+          </div>
+          <div class="field">
+            <label>备注（进 AI）</label>
+            <textarea id="fNote">前两周偏概念，后做小程序。</textarea>
+          </div>
+          <div class="sheet-actions">
+            <button class="ghost" type="button" id="closeModal">取消</button>
+            <button class="submit" type="button" id="createGoal" style="margin:0">生成计划</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal" id="editModal">
+        <div class="sheet">
+          <h3 id="editTitle">修改目标</h3>
+          <p class="rule-hint" id="editRuleHint">
+            规则：完成日只能<strong>往后</strong>，且不得早于<strong>今天+3</strong>；最早可选见下方；保存后立刻重排未来；今日任务不变。
+          </p>
+          <div class="field">
+            <label>计划完成时间 <span id="eEndMinHint" style="font-weight:500;color:var(--muted)"></span></label>
+            <input id="eEnd" type="date" />
+          </div>
+          <div class="field">
+            <label>备注</label>
+            <textarea id="eNote"></textarea>
+          </div>
+          <div class="sheet-actions">
+            <button class="ghost" type="button" id="closeEdit">取消</button>
+            <button class="submit" type="button" id="saveEdit" style="margin:0">保存并重排</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 首页 Structure = 多目标列表；点行=编辑完成日/备注（ADR-0014）
+    let goals = [
+      {
+        id: 1,
+        title: "通过看书学会 agent",
+        status: "active",
+        progress: 35,
+        planEnd: "2026-09-05",
+        note: "前两周偏概念，后做小程序",
+      },
+      {
+        id: 2,
+        title: "考研数学一轮",
+        status: "planning",
+        progress: 10,
+        planEnd: "2026-12-01",
+        note: "每天一节基础",
+      },
+    ];
+    let editingGoalId = null;
+
+    // 今日：goal1 两条（顺延叠加）；甘特同日格未全完成=未完成色
+    let todayTasks = [
+      {
+        id: 21,
+        goalId: 1,
+        goalTitle: "通过看书学会 agent",
+        title: "看第一二章（昨未完成顺延）",
+        status: "pending",
+        reason: null,
+        expanded: false,
+        milestone: "1.0 懂概念",
+      },
+      {
+        id: 22,
+        goalId: 1,
+        goalTitle: "通过看书学会 agent",
+        title: "看第三章",
+        status: "pending",
+        reason: null,
+        expanded: false,
+        milestone: "1.0 懂概念",
+      },
+      {
+        id: 31,
+        goalId: 2,
+        goalTitle: "考研数学一轮",
+        title: "极限与连续",
+        status: "pending",
+        reason: null,
+        expanded: false,
+        milestone: "1.0 高数基础",
+      },
+    ];
+
+    // 演示「今天」；日期轴 = today±30（ADR-0013），进入页滚到今天居中
+    const previewToday = "2026-08-03";
+    const GANTT_HALF_DAYS = 30;
+
+    function parseISO(s) {
+      const [y, m, d] = s.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    }
+    function toISO(dt) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+    function addDays(iso, n) {
+      const dt = parseISO(iso);
+      dt.setDate(dt.getDate() + n);
+      return toISO(dt);
+    }
+    function buildDateAxis(today, half = GANTT_HALF_DAYS) {
+      const iso = [];
+      const labels = [];
+      for (let i = -half; i <= half; i++) {
+        const day = addDays(today, i);
+        iso.push(day);
+        labels.push(day.slice(5).replace("-", "/"));
+      }
+      return { iso, labels, from: iso[0], to: iso[iso.length - 1] };
+    }
+    const ganttAxis = buildDateAxis(previewToday);
+    const ganttIso = ganttAxis.iso;
+    const ganttDates = ganttAxis.labels;
+
+    // plannedDays: 日期 → 任务名或任务名数组；dayDone: 该日是否全部完成（ADR-0016）
+    const ganttGoals = [
+      {
+        id: 1,
+        title: "通过看书学会 agent",
+        status: "active",
+        progress: 35,
+        open: true,
+        milestones: [
+          {
+            code: "1.0",
+            title: "懂概念",
+            start: "2026-08-01",
+            end: "2026-08-10",
+            plannedDays: {
+              "2026-08-01": "开篇导读",
+              "2026-08-02": "看第一二章",
+              // 同日两条：未全部完成 → 格=未完成色
+              "2026-08-03": ["看第一二章（顺延）", "看第三章"],
+              "2026-08-04": "看第四五章",
+              "2026-08-05": "做概念笔记",
+              "2026-08-06": "小测",
+              "2026-08-08": "复习错题",
+              "2026-08-10": "阶段小结",
+            },
+            dayDone: {
+              "2026-08-01": true,
+              "2026-08-02": true,
+              "2026-08-03": false,
+            },
+          },
+          {
+            code: "2.0",
+            title: "能使用",
+            start: "2026-08-11",
+            end: "2026-08-20",
+            plannedDays: {
+              "2026-08-11": "搭第一个 demo",
+              "2026-08-12": "跟教程跑通",
+              "2026-08-15": "改一个小功能",
+              "2026-08-20": "使用小结",
+            },
+          },
+          {
+            code: "3.0",
+            title: "做出完整小程序",
+            start: "2026-08-21",
+            end: "2026-09-05",
+            plannedDays: {
+              "2026-08-21": "搭页面骨架",
+              "2026-08-25": "接 API",
+              "2026-09-01": "联调",
+              "2026-09-05": "上线检查",
+            },
+          },
+        ],
+      },
+      {
+        id: 2,
+        title: "考研数学一轮",
+        status: "planning",
+        progress: 10,
+        open: false,
+        milestones: [
+          {
+            code: "1.0",
+            title: "高数基础",
+            start: "2026-08-01",
+            end: "2026-08-15",
+            plannedDays: {
+              "2026-08-02": "极限",
+              "2026-08-03": "连续",
+              "2026-08-04": "导数",
+              "2026-08-10": "复习",
+              "2026-08-15": "测验",
+            },
+            dayDone: { "2026-08-02": true },
+          },
+          {
+            code: "2.0",
+            title: "线代入门",
+            start: "2026-08-16",
+            end: "2026-08-31",
+            plannedDays: {
+              "2026-08-16": "行列式",
+              "2026-08-20": "矩阵",
+              "2026-08-28": "习题",
+            },
+          },
+        ],
+      },
+    ];
+
+    function pickCurrentMilestone(milestones, today) {
+      const inWindow = milestones.find((m) => m.start <= today && today <= m.end);
+      if (inWindow) return inWindow;
+      const upcoming = milestones.filter((m) => m.start > today).sort((a, b) => a.start.localeCompare(b.start));
+      if (upcoming.length) return upcoming[0];
+      return milestones[milestones.length - 1];
+    }
+
+    function fmtRange(start, end) {
+      const f = (s) => s.slice(5).replace("-", "/");
+      return `${f(start)} – ${f(end)}`;
+    }
+
+    function dayTasksList(m, day) {
+      const v = m.plannedDays?.[day];
+      if (v == null) return [];
+      return Array.isArray(v) ? v : [v];
+    }
+
+    /** null=无安排；pending=未来未开始；done/not_done 仅用于 ≤today */
+    function cellsForMilestone(m) {
+      return ganttIso.map((day) => {
+        const tasks = dayTasksList(m, day);
+        if (!tasks.length) return null;
+        if (day > previewToday) return "pending"; // 今天之后：未开始，绝不用未完成橙
+        return m.dayDone?.[day] ? "done" : "not_done";
+      });
+    }
+
+    const restWeek = [
+      {
+        date: "2026-08-05",
+        label: "Tuesday · 8/5",
+        items: [
+          { title: "做概念笔记", goalTitle: "通过看书学会 agent" },
+          { title: "导数习题", goalTitle: "考研数学一轮" },
+        ],
+      },
+      {
+        date: "2026-08-06",
+        label: "Wednesday · 8/6",
+        items: [{ title: "小测", goalTitle: "通过看书学会 agent" }],
+      },
+      {
+        date: "2026-08-11",
+        label: "Monday · 8/11",
+        items: [{ title: "搭第一个 demo", goalTitle: "通过看书学会 agent" }],
+      },
+    ];
+    let weekExpanded = false;
+
+    const structureEl = document.getElementById("structure");
+    const todayEl = document.getElementById("todayTasks");
+    const restEl = document.getElementById("restWeek");
+    const leftEl = document.getElementById("leftCount");
+    const toastEl = document.getElementById("toast");
+    const modal = document.getElementById("modal");
+    const editModal = document.getElementById("editModal");
+
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      clearTimeout(toastEl._t);
+      toastEl._t = setTimeout(() => toastEl.classList.remove("show"), 2200);
+    }
+
+    function renderStructure() {
+      structureEl.innerHTML = goals.map((g) => `
+        <div class="node" data-goal-edit="${g.id}" style="cursor:pointer;border-radius:10px;padding:8px;margin:0 -4px">
+          <div class="code">${g.status === "planning" ? "计划中" : "进行中"}</div>
+          <div class="node-title">${g.title}<div class="goal-sub">完成 ${g.planEnd.slice(5).replace("-", "/")} · 点此修改</div></div>
+          <div class="pct">${g.progress}%</div>
+          <div class="bar"><i style="width:${g.progress}%"></i></div>
+        </div>
+      `).join("");
+    }
+
+    function renderToday() {
+      const left = todayTasks.filter((t) => t.status !== "done").length;
+      leftEl.textContent = `全目标 · ${todayTasks.length} 条 · ${left} 未完成`;
+
+      if (!todayTasks.length) {
+        todayEl.innerHTML = `<p style="margin:0;font-size:13px;color:var(--muted)">今日各目标均无安排</p>`;
+        return;
+      }
+
+      todayEl.innerHTML = todayTasks.map((t) => {
+        const done = t.status === "done";
+        const notDone = t.status === "not_done";
+        const expanded = !!t.expanded;
+        return `
+          <div class="task ${done ? "done" : ""} ${expanded ? "expanded" : ""}" data-id="${t.id}">
+            <div class="task-row" data-action="toggle-expand">
+              <div class="check" data-action="toggle-check" role="checkbox" aria-checked="${done}">${done ? "✓" : ""}</div>
+              <div class="task-name">${t.title}<div class="goal-sub">${t.goalTitle} · ${t.milestone || ""}</div></div>
+              ${notDone ? '<span class="chip">未完成</span>' : ""}
+              ${done ? '<span class="badge" style="background:#e5f3ec;color:#145239">已完成</span>' : ""}
+              ${!done && !notDone ? '<span class="badge" style="background:#eef2ef;color:#5c6b63">待处理</span>' : ""}
+            </div>
+            <div class="expand">
+              <label>未完成原因</label>
+              <textarea
+                placeholder="请输入未完成原因..."
+                data-reason
+                ${done ? "disabled" : ""}
+              >${t.reason || ""}</textarea>
+              <button
+                class="submit"
+                type="button"
+                data-action="submit-incomplete"
+                ${done ? "disabled" : ""}
+              >提交</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderRest() {
+      const count = restWeek.reduce((n, d) => n + d.items.length, 0);
+      const card = document.getElementById("weekCard");
+      const badge = document.getElementById("weekBadge");
+      const chev = document.getElementById("weekChev");
+      card.classList.toggle("collapsed", !weekExpanded);
+      badge.textContent = weekExpanded ? "点击收起" : `本周还有 ${count} 项 · 点击展开`;
+      chev.textContent = weekExpanded ? "˅" : "›";
+      restEl.innerHTML = restWeek.map((d) => `
+        <div class="week-day">
+          <h4>${d.label}</h4>
+          ${d.items.map((i) => `<div class="week-item">${i.title}<div class="goal-sub">${i.goalTitle}</div></div>`).join("")}
+        </div>
+      `).join("");
+    }
+
+    function earliestPlanEnd(currentEnd, todayIso) {
+      // ADR-0002: max(current+1, today+3)
+      const afterCurrent = addDaysISO(currentEnd, 1);
+      const minByToday = addDaysISO(todayIso, 3);
+      return afterCurrent > minByToday ? afterCurrent : minByToday;
+    }
+
+    function openGoalEdit(id) {
+      const g = goals.find((x) => x.id === id);
+      if (!g) return;
+      editingGoalId = id;
+      const today = "2026-08-02";
+      const earliest = earliestPlanEnd(g.planEnd, today);
+      document.getElementById("editTitle").textContent = `修改 · ${g.title}`;
+      document.getElementById("editRuleHint").innerHTML =
+        `规则（ADR-0002）：只能<strong>往后</strong>改，且 ≥ <strong>今天+3</strong>。` +
+        `当前完成日 ${g.planEnd.slice(5).replace("-", "/")} → 最早可选 <strong>${earliest.slice(5).replace("-", "/")}</strong>。` +
+        `保存后立刻重排明天及以后；今日任务不变。`;
+      const endInput = document.getElementById("eEnd");
+      endInput.min = earliest;
+      endInput.value = g.planEnd < earliest ? earliest : g.planEnd;
+      // 若当前值仍等于旧完成日，选中最早可选日方便用户直接顺延
+      if (endInput.value === g.planEnd) endInput.value = earliest;
+      document.getElementById("eEndMinHint").textContent = `（最早 ${earliest.slice(5).replace("-", "/")}）`;
+      document.getElementById("eNote").value = g.note || "";
+      editModal.classList.add("show");
+    }
+
+    function addDaysISO(iso, n) {
+      const [y, m, d] = iso.split("-").map(Number);
+      const dt = new Date(y, m - 1, d);
+      dt.setDate(dt.getDate() + n);
+      return toISO(dt);
+    }
+
+    todayEl.addEventListener("click", (e) => {
+      const taskEl = e.target.closest(".task");
+      if (!taskEl) return;
+      const id = Number(taskEl.dataset.id);
+      const task = todayTasks.find((t) => t.id === id);
+      if (!task) return;
+
+      const actionEl = e.target.closest("[data-action]");
+      const action = actionEl?.dataset.action;
+
+      if (action === "submit-incomplete") {
+        if (task.status === "done") return;
+        const reason = taskEl.querySelector("[data-reason]")?.value?.trim();
+        if (!reason) {
+          toast("请填写未完成原因");
+          return;
+        }
+        task.status = "not_done";
+        task.reason = reason;
+        task.expanded = true;
+        renderToday();
+        toast("已提交未完成原因 · 将触发周内顺延（模拟）");
+        return;
+      }
+
+      // 1) 点 checkbox：只切换完成态（不负责展开）
+      if (action === "toggle-check" || e.target.closest(".check")) {
+        e.stopPropagation();
+        if (task.status === "done") {
+          task.status = "pending";
+        } else {
+          const typed = taskEl.querySelector("[data-reason]")?.value || task.reason || "";
+          task.status = "done";
+          task.reason = typed; // 展示可保留；业务按 done，忽略原因
+        }
+        renderToday();
+        toast(task.status === "done"
+          ? "点了 checkbox · 视为完成"
+          : "取消完成 · 可展开任务填写未完成原因");
+        return;
+      }
+
+      // 2) 点任务行（标题区）：展开/收起原因区
+      if (action === "toggle-expand" || e.target.closest(".task-name")) {
+        // 先保存当前 textarea 草稿
+        const typed = taskEl.querySelector("[data-reason]")?.value;
+        if (typeof typed === "string") task.reason = typed;
+        task.expanded = !task.expanded;
+        renderToday();
+      }
+    });
+
+    function showView(name) {
+      document.getElementById("viewHome").classList.toggle("active", name === "home");
+      document.getElementById("viewGantt").classList.toggle("active", name === "gantt");
+    }
+
+    function cellHtml(st, isToday, title) {
+      const todayCls = isToday ? " is-today" : "";
+      if (st == null) return `<td class="cell${todayCls}"><div class="dot" title="无安排"></div></td>`;
+      const tip = title || st;
+      return `<td class="cell ${st} planned${todayCls}"><div class="dot" title="${tip}"></div></td>`;
+    }
+
+    function scrollGanttToToday() {
+      const todayIdx = ganttIso.indexOf(previewToday);
+      if (todayIdx < 0) return;
+      document.querySelectorAll(".goal-block.open .gantt-wrap").forEach((wrap) => {
+        if (wrap.clientWidth < 40) return;
+        const labelTh = wrap.querySelector("th.row-label");
+        const sampleTh = wrap.querySelector("th:not(.row-label)");
+        const labelW = labelTh?.offsetWidth || 88;
+        const cellW = sampleTh?.offsetWidth || 34;
+        // 今天列中心对齐到滚动视口中心（左侧 sticky 里程碑列仍可见）
+        const todayCenterX = labelW + todayIdx * cellW + cellW / 2;
+        const target = todayCenterX - wrap.clientWidth / 2;
+        wrap.scrollLeft = Math.max(0, Math.min(target, wrap.scrollWidth - wrap.clientWidth));
+      });
+    }
+
+    function centerGanttOnTodaySoon() {
+      // 视图从 display:none 切出后需等布局完成再滚
+      requestAnimationFrame(() => {
+        scrollGanttToToday();
+        setTimeout(scrollGanttToToday, 50);
+        setTimeout(scrollGanttToToday, 200);
+      });
+    }
+
+    function renderGantt(opts = {}) {
+      const { centerToday = false } = opts;
+      const hint = document.getElementById("ganttWindowHint");
+      if (hint) {
+        hint.textContent = `窗口 ${fmtRange(ganttAxis.from, ganttAxis.to)} · 今天 ${previewToday.slice(5).replace("-", "/")} 进入时居中`;
+      }
+      const list = document.getElementById("ganttList");
+      list.innerHTML = ganttGoals.map((g) => {
+        const cur = pickCurrentMilestone(g.milestones, previewToday);
+        const todayList = dayTasksList(cur, previewToday);
+        const todayTaskHint = todayList.length
+          ? `本里程碑今日 ${todayList.length} 项：${todayList.join("、")}${cur.dayDone?.[previewToday] ? "（已全完成）" : "（未全完成→本格未完成色）"}`
+          : "本里程碑今日无安排";
+        const head = `<tr><th class="row-label">里程碑</th>${ganttDates.map((d, i) => {
+          const iso = ganttIso[i];
+          const isToday = iso === previewToday;
+          return `<th class="${isToday ? "is-today" : ""}" data-iso="${iso}">${isToday ? "今天<br>" : ""}${d}</th>`;
+        }).join("")}</tr>`;
+        const body = g.milestones.map((m) => {
+          const cells = cellsForMilestone(m);
+          return `
+          <tr class="${m === cur ? "ms-current-row" : ""}">
+            <td class="row-label">${m.code} ${m.title}${m === cur ? " · 当前" : ""}<br><span style="font-weight:500;color:#5c6b63">${fmtRange(m.start, m.end)}</span></td>
+            ${cells.map((st, i) => {
+              const day = ganttIso[i];
+              const tip = dayTasksList(m, day).join("、") || st;
+              return cellHtml(st, day === previewToday, tip);
+            }).join("")}
+          </tr>`;
+        }).join("");
+        return `
+          <div class="goal-block ${g.open ? "open" : ""}" data-goal="${g.id}">
+            <div class="goal-row" data-action="toggle-goal">
+              <span class="chev">›</span>
+              <div class="goal-meta">
+                <h3>${g.title}</h3>
+                <p>目标 · ${g.progress}% · 展开看全里程碑甘特</p>
+              </div>
+              <span class="badge">${g.progress}%</span>
+            </div>
+            <div class="ms-wrap">
+              <div class="current-ms">
+                <p class="eyebrow">当前里程碑</p>
+                <h4>${cur.code} ${cur.title}</h4>
+                <p>${fmtRange(cur.start, cur.end)} · ${todayTaskHint}</p>
+              </div>
+              <div class="ms-title">每日进度 · 按里程碑；≤今天看完成态；今天之后=未开始</div>
+              <div class="gantt-wrap">
+                <table class="gantt"><thead>${head}</thead><tbody>${body}</tbody></table>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+      if (centerToday) centerGanttOnTodaySoon();
+    }
+
+    document.getElementById("ganttList").addEventListener("click", (e) => {
+      const row = e.target.closest("[data-action='toggle-goal']");
+      if (!row) return;
+      const block = row.closest(".goal-block");
+      const id = Number(block.dataset.goal);
+      const g = ganttGoals.find((x) => x.id === id);
+      if (!g) return;
+      g.open = !g.open;
+      renderGantt({ centerToday: g.open });
+    });
+
+    structureEl.addEventListener("click", (e) => {
+      const row = e.target.closest("[data-goal-edit]");
+      if (!row) return;
+      openGoalEdit(Number(row.dataset.goalEdit));
+    });
+
+    document.getElementById("weekToggle").onclick = () => {
+      weekExpanded = !weekExpanded;
+      renderRest();
+    };
+
+    document.getElementById("closeEdit").onclick = () => editModal.classList.remove("show");
+    document.getElementById("saveEdit").onclick = () => {
+      const g = goals.find((x) => x.id === editingGoalId);
+      if (!g) return;
+      const newEnd = document.getElementById("eEnd").value;
+      const newNote = document.getElementById("eNote").value.trim();
+      const today = "2026-08-02";
+      const earliest = earliestPlanEnd(g.planEnd, today);
+      const noteOnly = newNote !== (g.note || "") && (!newEnd || newEnd === g.planEnd);
+
+      if (noteOnly) {
+        g.note = newNote;
+        editModal.classList.remove("show");
+        renderStructure();
+        toast("已更新备注 · 立刻重排未来（完成日未变，今日不动）");
+        return;
+      }
+
+      if (!newEnd || newEnd <= g.planEnd) {
+        toast("拒绝：完成日必须晚于当前（DEADLINE_NOT_LATER）");
+        return;
+      }
+      if (newEnd < addDaysISO(today, 3)) {
+        toast("拒绝：不得早于今天+3（DEADLINE_TOO_SOON）");
+        return;
+      }
+      if (newEnd < earliest) {
+        toast(`拒绝：最早可选 ${earliest}`);
+        return;
+      }
+
+      g.planEnd = newEnd;
+      g.note = newNote;
+      editModal.classList.remove("show");
+      renderStructure();
+      toast("已保存 · 立刻入队重排未来排期（今日任务不变）");
+    };
+    editModal.addEventListener("click", (e) => {
+      if (e.target === editModal) editModal.classList.remove("show");
+    });
+
+    document.getElementById("openGantt").onclick = () => {
+      showView("gantt");
+      renderGantt({ centerToday: true });
+      toast("已将 今天(8/3) 滚到视口中间");
+    };
+    document.getElementById("backHome").onclick = () => showView("home");
+
+    document.getElementById("plusBtn").onclick = () => modal.classList.add("show");
+    document.getElementById("closeModal").onclick = () => modal.classList.remove("show");
+    document.getElementById("createGoal").onclick = () => {
+      modal.classList.remove("show");
+      toast("已模拟创建 · 将返回 job_id 并轮询生成（预览）");
+    };
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.classList.remove("show");
+    });
+
+    renderStructure();
+    renderToday();
+    renderRest();
+  </script>
+</body>
+</html>

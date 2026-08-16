@@ -1,0 +1,22 @@
+# 线上环境 —— 对齐现有 docker run：
+#   docker run -d --name personal_db -p 3306:3306 \
+#     -e MYSQL_ROOT_PASSWORD=... -v mysql_data:/var/lib/mysql \
+#     --restart always mysql:8.0
+#
+# 用法：
+#   export MYSQL_ROOT_PASSWORD='你的密码'
+#   docker compose -f docker-compose.yml -f docker-compose.live.yml up -d
+
+name: personal_milestone_live
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: personal_db
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?export MYSQL_ROOT_PASSWORD first}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]

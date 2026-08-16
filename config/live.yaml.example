@@ -1,0 +1,13 @@
+# 线上配置模板：cp config/live.yaml.example config/live.yaml 并改真实值
+# config/live.yaml 勿提交仓库
+# 启动：APP_ENV=live uvicorn main:app --host 0.0.0.0 --port 8000
+
+app_env: live
+# 与 personal_db 容器一致：root + MYSQL_ROOT_PASSWORD
+database_url: mysql+pymysql://root:YOUR_ROOT_PASSWORD@127.0.0.1:3306/personal_milestone
+jwt_secret: replace-with-long-random-secret
+jwt_expire_seconds: 7200
+llm_mode: mock
+internal_token: replace-with-long-random-internal-token
+wechat_mock: false
+enable_docs: false
