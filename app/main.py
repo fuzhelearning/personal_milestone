@@ -3,7 +3,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.db import Base, engine
 from app.errors import AppError, app_error_handler
 from app.routers import auth, gantt, goals, home, internal, jobs
 
@@ -49,7 +48,7 @@ def create_app() -> FastAPI:
     def _startup() -> None:
         cfg = get_settings()
         cfg.validate_for_runtime()
-        Base.metadata.create_all(bind=engine)
+        # 表结构由 Alembic 管理：APP_ENV=... alembic upgrade head
 
     @app.get("/health")
     def health() -> dict:

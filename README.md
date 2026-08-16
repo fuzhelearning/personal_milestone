@@ -29,6 +29,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+APP_ENV=dev alembic upgrade head
 APP_ENV=dev uvicorn main:app --reload --port 8000
 ```
 
@@ -36,6 +37,7 @@ APP_ENV=dev uvicorn main:app --reload --port 8000
 - OpenAPI：`http://127.0.0.1:8000/docs`
 - 微信登录：任意 `code` 即可签发 JWT
 - 默认连接见 `config/dev.yaml` → `database_url`
+- 表结构由 Alembic 管理（`alembic/versions/`），**不要**再依赖启动时 `create_all`
 
 ### Compose 命令
 
@@ -64,12 +66,31 @@ dc-live up -d
 
 ## 线上（live）
 
+已有 `personal_db` 时：填好 `config/live.yaml`，再编辑 `scripts/start_live.sh` 里的密码后执行：
+
 ```bash
-cp config/live.yaml.example config/live.yaml
-# 编辑 config/live.yaml：真实 database_url / jwt_secret / internal_token，wechat_mock: false
-export MYSQL_ROOT_PASSWORD='你的MySQL密码'
-docker compose -f docker-compose.yml -f docker-compose.live.yml up -d
-APP_ENV=live uvicorn main:app --host 0.0.0.0 --port 8000
+bash scripts/start_live.sh
+```
+
+脚本内会执行 `APP_ENV=live alembic upgrade head` 再建表并启动。
+
+## 数据库迁移（Alembic）
+
+```bash
+# 应用迁移到最新
+APP_ENV=dev alembic upgrade head
+
+# 改模型后生成新迁移
+APP_ENV=dev alembic revision --autogenerate -m "add_xxx"
+
+# 查看当前版本
+APP_ENV=dev alembic current
+```
+
+若库里表已由旧版 `create_all` 建好、只需登记版本：
+
+```bash
+APP_ENV=dev alembic stamp head
 ```
 
 ## 冒烟流程

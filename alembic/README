@@ -1,0 +1,11 @@
+Alembic migrations for personal_milestone.
+
+常用命令（在项目根目录）：
+
+  APP_ENV=dev alembic upgrade head
+  APP_ENV=live alembic upgrade head
+  APP_ENV=dev alembic revision --autogenerate -m "describe_change"
+  APP_ENV=dev alembic current
+  APP_ENV=dev alembic history
+
+数据库 URL 从 config/{APP_ENV}.yaml 的 database_url 读取。
