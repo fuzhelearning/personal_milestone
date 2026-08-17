@@ -1,2 +1,4 @@
+schema: spec-driven
 references:
-  - team-plans
+  - personal-milestone-specs
+mergeReferences: true
