@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import DayAssignment, DayEntry, Goal, TaskNode, User
+from app.services.assignments import active_task_ids_by_goal
 from app.timeutil import user_today, weekday_name, week_sunday
 
 
@@ -39,6 +40,7 @@ def build_home(db: Session, user: User) -> dict:
     )
     goal_map = {g.id: g for g in goals}
     goal_ids = list(goal_map.keys())
+    active_tasks = active_task_ids_by_goal(db, goals)
 
     structure_goals = [
         {
@@ -97,6 +99,8 @@ def build_home(db: Session, user: User) -> dict:
 
         by_future: dict = defaultdict(list)
         for a in assigns:
+            if a.task_id not in active_tasks.get(a.goal_id, set()):
+                continue
             g = goal_map.get(a.goal_id)
             t = tasks.get(a.task_id)
             if not g or not t:

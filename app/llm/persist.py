@@ -23,6 +23,7 @@ def write_llm_call_log(
     db: Session,
     goal: Goal,
     *,
+    purpose: str = "wbs_generate",
     model: str,
     prompt_hash: str,
     request_meta: dict,
@@ -33,7 +34,7 @@ def write_llm_call_log(
     log = LlmCallLog(
         user_id=goal.user_id,
         goal_id=goal.id,
-        purpose="wbs_generate",
+        purpose=purpose,
         model=model,
         prompt_hash=prompt_hash,
         request_meta=request_meta,

@@ -48,3 +48,31 @@ class WbsGeneratePayload(BaseModel):
     assumptions: list[str] | None = Field(default=None, max_length=20)
     risks: list[str] | None = Field(default=None, max_length=20)
     suggested_deadline_change: str | None = None
+
+
+class TaskUpdateOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=1, max_length=32)
+    start_date: str
+    end_date: str
+
+
+class MilestoneUpdateOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=1, max_length=32)
+    end_date: str
+    start_date: str | None = None
+
+
+class ReplanPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    task_updates: list[TaskUpdateOut] = Field(default_factory=list, max_length=40)
+    milestone_updates: list[MilestoneUpdateOut] = Field(default_factory=list, max_length=20)
+    day_assignments: list[DayAssignmentOut] = Field(default_factory=list)
+    assumptions: list[str] | None = Field(default=None, max_length=20)
+    risks: list[str] | None = Field(default=None, max_length=20)
+    suggested_deadline_change: str | None = None
+    suggested_plan_end_date: str | None = None

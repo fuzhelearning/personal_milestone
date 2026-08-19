@@ -17,7 +17,7 @@ class DeepSeekCallError(RuntimeError):
         self.raw_response = raw_response
 
 
-def chat_completions(messages: list[dict]) -> str:
+def chat_completions(messages: list[dict], *, max_tokens: int | None = None) -> str:
     """POST {base}/chat/completions，要求 json_object，返回 assistant 正文。"""
     settings = get_settings()
     base = settings.resolved_llm_base_url().rstrip("/")
@@ -32,6 +32,8 @@ def chat_completions(messages: list[dict]) -> str:
         "messages": messages,
         "response_format": {"type": "json_object"},
     }
+    if max_tokens is not None:
+        body["max_tokens"] = max_tokens
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",

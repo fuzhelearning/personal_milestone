@@ -761,7 +761,7 @@
         <div class="sheet">
           <h3 id="editTitle">修改目标</h3>
           <p class="rule-hint" id="editRuleHint">
-            规则：完成日只能<strong>往后</strong>，且不得早于<strong>今天+3</strong>；最早可选见下方；保存后立刻重排未来；今日任务不变。
+            规则：完成日只能<strong>往后</strong>，且不得早于<strong>今天+3</strong>。保存后入队 LLM 重排，须预览并<strong>确认新计划</strong>后完成日才生效；今日任务不变。
           </p>
           <div class="field">
             <label>计划完成时间 <span id="eEndMinHint" style="font-weight:500;color:var(--muted)"></span></label>
@@ -773,7 +773,20 @@
           </div>
           <div class="sheet-actions">
             <button class="ghost" type="button" id="closeEdit">取消</button>
-            <button class="submit" type="button" id="saveEdit" style="margin:0">保存并重排</button>
+            <button class="submit" type="button" id="saveEdit" style="margin:0">保存并生成草案</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal" id="replanModal">
+        <div class="sheet">
+          <h3 id="replanTitle">重排预览</h3>
+          <p class="rule-hint" id="replanHint">LLM 草案生成中…确认前 Structure 完成日保持原值。</p>
+          <div id="replanPreview" style="max-height:220px;overflow:auto;font-size:13px;line-height:1.5;margin:12px 0"></div>
+          <p id="replanDeadlineHint" style="display:none;font-size:13px;color:#b45309;margin:0 0 8px"></p>
+          <div class="sheet-actions">
+            <button class="ghost" type="button" id="cancelReplan">取消草案</button>
+            <button class="submit" type="button" id="confirmReplan" style="margin:0">确认新计划</button>
           </div>
         </div>
       </div>
@@ -801,6 +814,63 @@
       },
     ];
     let editingGoalId = null;
+    let pendingReplan = null;
+
+    function mockPollReplanJob(goalId, newEnd) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const tooTight = newEnd <= addDaysISO("2026-08-02", 5);
+          resolve({
+            job_id: 9001 + goalId,
+            generation_id: 5000 + goalId,
+            confirmable: !tooTight,
+            suggested_deadline_change: tooTight ? "建议将完成日延长至 2026-09-15 或更晚" : null,
+            preview: [
+              { date: "2026-08-03", items: [{ task_code: "1.1", title: "任务1" }] },
+              { date: "2026-08-04", items: [{ task_code: "1.2", title: "任务2" }] },
+              { date: "2026-08-05", items: [{ task_code: "1.3", title: "任务3" }] },
+            ],
+            pending_new_plan_end_date: newEnd,
+          });
+        }, 600);
+      });
+    }
+
+    function openReplanPreview(payload) {
+      pendingReplan = payload;
+      const modal = document.getElementById("replanModal");
+      const confirmBtn = document.getElementById("confirmReplan");
+      const hint = document.getElementById("replanDeadlineHint");
+      document.getElementById("replanTitle").textContent = `重排预览 · Job ${payload.job_id}`;
+      document.getElementById("replanHint").textContent =
+        "以下为 suggested 草案（甘特/日安排）。确认前 active 计划与 Structure 完成日不变。";
+      document.getElementById("replanPreview").innerHTML = payload.preview
+        .map((row) => `<div><strong>${row.date.slice(5).replace("-", "/")}</strong> · ${row.items.map((i) => i.title).join("、")}</div>`)
+        .join("");
+      if (payload.deadline_adjustment === "longer" || payload.confirmable === false) {
+        hint.style.display = "block";
+        const suggested = payload.suggested_plan_end_date || "更晚日期";
+        hint.textContent = payload.suggested_deadline_change
+          ? `排期不足：${payload.suggested_deadline_change}。请重新选择更晚完成日后再试。`
+          : `排期不足：建议延至 ${suggested}。请重新选择更晚完成日后再试。`;
+        confirmBtn.disabled = true;
+        confirmBtn.style.opacity = "0.45";
+      } else if (payload.deadline_adjustment === "shorter") {
+        hint.style.display = "block";
+        hint.textContent =
+          `你选择了 ${payload.requested_plan_end_date}，AI 建议 ${payload.suggested_plan_end_date} 即可完成。确认后将采用 AI 建议的完成日。`;
+        confirmBtn.disabled = false;
+        confirmBtn.style.opacity = "1";
+      } else {
+        hint.style.display = payload.requested_plan_end_date ? "block" : "none";
+        if (payload.requested_plan_end_date) {
+          hint.textContent = `将延至 ${payload.requested_plan_end_date}，确认后生效。`;
+        }
+        confirmBtn.disabled = false;
+        confirmBtn.style.opacity = "1";
+      }
+      modal.classList.add("show");
+    }
 
     // 今日：goal1 两条（顺延叠加）；甘特同日格未全完成=未完成色
     let todayTasks = [
@@ -1113,7 +1183,7 @@
       document.getElementById("editRuleHint").innerHTML =
         `规则（ADR-0002）：只能<strong>往后</strong>改，且 ≥ <strong>今天+3</strong>。` +
         `当前完成日 ${g.planEnd.slice(5).replace("-", "/")} → 最早可选 <strong>${earliest.slice(5).replace("-", "/")}</strong>。` +
-        `保存后立刻重排明天及以后；今日任务不变。`;
+        `保存后入队 LLM 重排 → 预览草案 → 确认后完成日才更新；今日任务不变。`;
       const endInput = document.getElementById("eEnd");
       endInput.min = earliest;
       endInput.value = g.planEnd < earliest ? earliest : g.planEnd;
@@ -1300,7 +1370,7 @@
     };
 
     document.getElementById("closeEdit").onclick = () => editModal.classList.remove("show");
-    document.getElementById("saveEdit").onclick = () => {
+    document.getElementById("saveEdit").onclick = async () => {
       const g = goals.find((x) => x.id === editingGoalId);
       if (!g) return;
       const newEnd = document.getElementById("eEnd").value;
@@ -1313,7 +1383,7 @@
         g.note = newNote;
         editModal.classList.remove("show");
         renderStructure();
-        toast("已更新备注 · 立刻重排未来（完成日未变，今日不动）");
+        toast("已更新备注 · 入队 note_replan（预览确认流，完成日未变）");
         return;
       }
 
@@ -1330,12 +1400,38 @@
         return;
       }
 
-      g.planEnd = newEnd;
       g.note = newNote;
+      const pendingEnd = newEnd;
       editModal.classList.remove("show");
-      renderStructure();
-      toast("已保存 · 立刻入队重排未来排期（今日任务不变）");
+      toast("已保存 · 轮询 replan Job…");
+      const payload = await mockPollReplanJob(g.id, pendingEnd);
+      payload.goal_id = g.id;
+      openReplanPreview(payload);
     };
+
+    document.getElementById("cancelReplan").onclick = () => {
+      document.getElementById("replanModal").classList.remove("show");
+      pendingReplan = null;
+      toast("已取消草案 · 完成日与 active 计划不变");
+    };
+
+    document.getElementById("confirmReplan").onclick = () => {
+      if (!pendingReplan || !pendingReplan.confirmable) return;
+      const g = goals.find((x) => x.id === pendingReplan.goal_id);
+      if (!g) return;
+      g.planEnd =
+        pendingReplan.deadline_adjustment === "shorter" && pendingReplan.suggested_plan_end_date
+          ? pendingReplan.suggested_plan_end_date
+          : pendingReplan.pending_new_plan_end_date || pendingReplan.requested_plan_end_date;
+      document.getElementById("replanModal").classList.remove("show");
+      renderStructure();
+      toast("已确认新计划 · Structure 完成日与安排已更新");
+      pendingReplan = null;
+    };
+
+    document.getElementById("replanModal").addEventListener("click", (e) => {
+      if (e.target.id === "replanModal") document.getElementById("replanModal").classList.remove("show");
+    });
     editModal.addEventListener("click", (e) => {
       if (e.target === editModal) editModal.classList.remove("show");
     });

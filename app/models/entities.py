@@ -134,6 +134,7 @@ class DeadlineChange(Base):
     new_end_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
     job_id: Mapped[int | None] = mapped_column(FK, nullable=True)
+    applied_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_now)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://personal-milestone.local/schemas/day_assignments_replan.schema.json",
+  "title": "DayAssignmentsReplanOutput",
+  "description": "deadline_replan / sunday_replan LLM delta 输出。禁止删除已确认 WBS 节点；task_codes 引用未完成任务。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "task_updates": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "start_date", "end_date"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "start_date": { "type": "string", "format": "date" },
+          "end_date": { "type": "string", "format": "date" }
+        }
+      }
+    },
+    "milestone_updates": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "end_date"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "end_date": { "type": "string", "format": "date" },
+          "start_date": { "type": "string", "format": "date" }
+        }
+      }
+    },
+    "day_assignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["date", "task_codes"],
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "task_codes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": { "type": "string", "minLength": 1, "maxLength": 32 }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string" }
+    },
+    "risks": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string" }
+    },
+    "suggested_deadline_change": {
+      "type": ["string", "null"],
+      "description": "排不下时中文建议；deadline 路径 longer 时不可确认"
+    },
+    "suggested_plan_end_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "LLM 认定的有效计划结束日"
+    }
+  }
+}

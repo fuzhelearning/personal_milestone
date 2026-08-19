@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -7,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.errors import AppError
 from app.llm.generate import run_wbs_generate
-from app.llm.replan import replan_future_assignments
-from app.models import Goal, Job, LlmCallLog, User
+from app.llm.replan_run import run_llm_replan
+from app.models import DeadlineChange, Goal, Job, LlmCallLog, User
 from app.timeutil import user_today
 
 
@@ -39,6 +40,7 @@ def enqueue_job(
     user_id: int | None,
     goal_id: int | None,
     process_now: bool = True,
+    deadline_change_id: int | None = None,
 ) -> Job:
     if goal_id and job_type in BUSY_TYPES:
         assert_goal_not_busy(db, goal_id)
@@ -50,6 +52,11 @@ def enqueue_job(
     )
     db.add(job)
     db.flush()
+    if deadline_change_id:
+        change = db.get(DeadlineChange, deadline_change_id)
+        if change:
+            change.job_id = job.id
+            db.flush()
     if process_now:
         try:
             process_job(db, job)
@@ -102,9 +109,91 @@ def _run_replan(db: Session, job: Job) -> None:
     if not goal:
         raise AppError("NOT_FOUND", "目标不存在", 404)
     user = db.get(User, goal.user_id)
-    today = user_today(user.timezone if user else "Asia/Shanghai")
-    n = replan_future_assignments(db, goal, today)
-    job.result_ref_json = {"replanned_assignments": n}
+    if not user:
+        raise AppError("NOT_FOUND", "用户不存在", 404)
+    today = user_today(user.timezone)
+
+    new_plan_end_date = goal.plan_end_date
+    deadline_change_id: int | None = None
+    if job.type == "deadline_replan":
+        change = db.scalar(
+            select(DeadlineChange).where(
+                DeadlineChange.job_id == job.id,
+                DeadlineChange.goal_id == goal.id,
+            )
+        )
+        if change:
+            deadline_change_id = change.id
+            new_plan_end_date = change.new_end_date
+
+    result = run_llm_replan(
+        db,
+        goal,
+        user,
+        today,
+        job_type=job.type,
+        new_plan_end_date=new_plan_end_date,
+        deadline_change_id=deadline_change_id,
+    )
+
+    if job.type == "sunday_replan":
+        if isinstance(result, dict):
+            job.result_ref_json = {
+                "applied": result.get("applied", True),
+                "suggested_deadline_change": result.get("suggested_deadline_change"),
+                "assignment_count": result.get("assignment_count", 0),
+                "llm_call_id": result.get("llm_call_id"),
+            }
+        return
+
+    gen = result
+    job.result_ref_json = _deadline_replan_result_ref(gen, deadline_change_id)
+
+
+def _deadline_replan_result_ref(gen, deadline_change_id: int | None) -> dict:
+    ref: dict = {
+        "generation_id": gen.id,
+        "deadline_change_id": deadline_change_id,
+        "confirmable": _confirmable_from_gen(gen),
+    }
+    if gen.raw_response:
+        try:
+            data = json.loads(gen.raw_response)
+            for key in (
+                "requested_plan_end_date",
+                "suggested_plan_end_date",
+                "current_plan_end_date",
+                "deadline_adjustment",
+                "suggested_deadline_change",
+            ):
+                if key in data and data[key] is not None:
+                    ref[key] = data[key]
+        except (json.JSONDecodeError, TypeError):
+            pass
+    if "suggested_deadline_change" not in ref:
+        val = _suggested_deadline_from_gen(gen)
+        if val:
+            ref["suggested_deadline_change"] = val
+    return ref
+
+
+def _suggested_deadline_from_gen(gen) -> str | None:
+    if not gen.raw_response:
+        return None
+    try:
+        import json
+
+        data = json.loads(gen.raw_response)
+        val = data.get("suggested_deadline_change")
+        return str(val) if val else None
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def _confirmable_from_gen(gen) -> bool:
+    from app.llm.replan_persist import generation_confirmable
+
+    return generation_confirmable(gen)
 
 
 def sweep_stale_llm_jobs(db: Session) -> dict:

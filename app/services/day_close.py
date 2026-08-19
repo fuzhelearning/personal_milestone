@@ -6,13 +6,12 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.llm.replan import replan_future_assignments
+from app.llm.replan_run import run_llm_replan
 from app.models import DayAssignment, DayEntry, Goal, JobRun, TaskNode, User
 
 
 def run_day_close(db: Session, *, as_of: datetime | None = None) -> dict:
-    """每天 23:59：回写进度；非周日顺延未完成；周日重排未来。"""
-    # 默认按上海日；多用户时按各自 timezone 取「今日」
+    """每天 23:59：回写进度；非周日顺延未完成；周日 LLM 重排未来。"""
     processed = 0
     skipped = 0
     users = list(db.scalars(select(User)).all())
@@ -25,83 +24,95 @@ def run_day_close(db: Session, *, as_of: datetime | None = None) -> dict:
         else:
             today = user_today(user.timezone)
 
-        # 按 user 维度幂等：biz_key = date:user_id
-        biz = f"{today.isoformat()}:u{user.id}"
-        run = db.scalar(select(JobRun).where(JobRun.job_type == "day_close", JobRun.biz_key == biz))
-        if run and run.status == "succeeded":
-            skipped += 1
-            continue
-        if not run:
-            run = JobRun(job_type="day_close", biz_key=biz, status="running", attempts=1)
-            db.add(run)
-            db.flush()
-        else:
-            run.status = "running"
-            run.attempts += 1
+        goals = list(
+            db.scalars(
+                select(Goal).where(
+                    Goal.user_id == user.id,
+                    Goal.deleted_at.is_(None),
+                    Goal.status.in_(("active", "planning")),
+                )
+            ).all()
+        )
+        for goal in goals:
+            biz = f"day_close:{goal.id}:{today.isoformat()}"
+            run = db.scalar(
+                select(JobRun).where(JobRun.job_type == "day_close", JobRun.biz_key == biz)
+            )
+            if run and run.status == "succeeded":
+                skipped += 1
+                continue
+            if not run:
+                run = JobRun(job_type="day_close", biz_key=biz, status="running", attempts=1)
+                db.add(run)
+                db.flush()
+            else:
+                run.status = "running"
+                run.attempts += 1
 
-        try:
-            _close_user_day(db, user, today)
-            run.status = "succeeded"
-            run.finished_at = datetime.utcnow()
-            processed += 1
-        except Exception as exc:  # noqa: BLE001
-            run.status = "failed"
-            run.last_error = str(exc)
-            run.finished_at = datetime.utcnow()
-            raise
+            try:
+                _close_goal_day(db, user, goal, today)
+                run.status = "succeeded"
+                run.finished_at = datetime.utcnow()
+                processed += 1
+            except Exception as exc:  # noqa: BLE001
+                run.status = "failed"
+                run.last_error = str(exc)
+                run.finished_at = datetime.utcnow()
+                raise
 
     return {"accepted": True, "processed": processed, "skipped": skipped}
 
 
-def _close_user_day(db: Session, user: User, today: date) -> None:
-    goals = list(
+def _close_goal_day(db: Session, user: User, goal: Goal, today: date) -> None:
+    is_sunday = today.weekday() == 6
+
+    assigns = list(
         db.scalars(
-            select(Goal).where(
-                Goal.user_id == user.id,
-                Goal.deleted_at.is_(None),
-                Goal.status.in_(("active", "planning")),
+            select(DayAssignment).where(
+                DayAssignment.goal_id == goal.id,
+                DayAssignment.plan_date == today,
             )
         ).all()
     )
-    is_sunday = today.weekday() == 6
-
-    for goal in goals:
-        assigns = list(
-            db.scalars(
-                select(DayAssignment).where(
-                    DayAssignment.goal_id == goal.id,
-                    DayAssignment.plan_date == today,
-                )
-            ).all()
+    for a in assigns:
+        e = db.scalar(
+            select(DayEntry).where(DayEntry.task_id == a.task_id, DayEntry.work_date == today)
         )
-        for a in assigns:
-            e = db.scalar(
-                select(DayEntry).where(DayEntry.task_id == a.task_id, DayEntry.work_date == today)
+        if not e:
+            e = DayEntry(
+                goal_id=goal.id,
+                user_id=user.id,
+                task_id=a.task_id,
+                work_date=today,
+                status="not_done",
+                incomplete_reason="日终未打卡",
             )
-            if not e:
-                e = DayEntry(
-                    goal_id=goal.id,
-                    user_id=user.id,
-                    task_id=a.task_id,
-                    work_date=today,
-                    status="not_done",
-                    incomplete_reason="日终未打卡",
-                )
-                db.add(e)
-                db.flush()
-            if e.status == "pending":
-                e.status = "not_done"
-                if not e.incomplete_reason:
-                    e.incomplete_reason = "日终未打卡"
-                e.updated_at = datetime.utcnow()
+            db.add(e)
+            db.flush()
+        if e.status == "pending":
+            e.status = "not_done"
+            if not e.incomplete_reason:
+                e.incomplete_reason = "日终未打卡"
+            e.updated_at = datetime.utcnow()
 
-            if e.status == "not_done" and not is_sunday:
-                _stack_assignment(db, goal, a.task_id, today + timedelta(days=1))
+        if e.status == "not_done" and not is_sunday:
+            _stack_assignment(db, goal, a.task_id, today + timedelta(days=1))
 
-        _recompute_progress(db, goal)
+    _recompute_progress(db, goal)
 
-        if is_sunday:
-            replan_future_assignments(db, goal, today)
+    if is_sunday and goal.active_wbs_generation_id:
+        try:
+            run_llm_replan(
+                db,
+                goal,
+                user,
+                today,
+                job_type="sunday_replan",
+                new_plan_end_date=goal.plan_end_date,
+            )
+        except Exception:
+            # LLM 失败时 active 计划不变；不回退规则重排
+            pass
 
 
 def _stack_assignment(db: Session, goal: Goal, task_id: int, to_date: date) -> None:

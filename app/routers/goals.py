@@ -100,6 +100,20 @@ def get_wbs_generation(
     return wbs_svc.generation_payload(db, gen)
 
 
+@router.post("/{goal_id}/wbs/generations/{generation_id}/cancel")
+def cancel_wbs(
+    goal_id: int,
+    generation_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    goal = goals_svc.get_owned_goal(db, goal_id, user.id)
+    gen = wbs_svc.get_generation(db, goal, generation_id)
+    result = wbs_svc.cancel_generation(db, goal, gen)
+    db.commit()
+    return result
+
+
 @router.post("/{goal_id}/wbs/generations/{generation_id}/confirm")
 def confirm_wbs(
     goal_id: int,
@@ -150,20 +164,24 @@ def plan_edit(
     user: User = Depends(get_current_user),
 ) -> dict:
     goal = goals_svc.get_owned_goal(db, goal_id, user.id)
-    goal, job_id = goals_svc.plan_edit(
+    goal, job_id, change_id = goals_svc.plan_edit(
         db, user, goal, new_plan_end_date=body.new_plan_end_date, note=body.note
     )
     db.commit()
     today = user_today(user.timezone)
-    response.status_code = 202
-    return {
+    response.status_code = 202 if job_id else 200
+    out = {
         "goal_id": goal.id,
-        "job_id": job_id,
-        "status": "queued",
+        "status": "queued" if job_id else goal.status,
         "plan_end_date": goal.plan_end_date.isoformat(),
         "note": goal.note,
         "earliest_allowed_date": earliest_plan_end(goal.plan_end_date, today).isoformat(),
     }
+    if job_id:
+        out["job_id"] = job_id
+    if change_id:
+        out["change_id"] = change_id
+    return out
 
 
 @router.post("/{goal_id}/today-tasks/{task_id}/complete")
@@ -256,14 +274,25 @@ def deadline_confirm(
     )
     if not change or change.status != "pending":
         raise AppError("NOT_FOUND", "变更记录不存在或不可确认", 404)
-    goal.plan_end_date = change.new_end_date
-    job = enqueue_job(db, job_type="deadline_replan", user_id=user.id, goal_id=goal.id)
     change.status = "confirmed"
     change.confirmed_at = datetime.utcnow()
-    change.job_id = job.id
+    db.flush()
+    job = enqueue_job(
+        db,
+        job_type="deadline_replan",
+        user_id=user.id,
+        goal_id=goal.id,
+        deadline_change_id=change.id,
+    )
     db.commit()
     response.status_code = 202
-    return {"change_id": change.id, "job_id": job.id, "status": "queued"}
+    return {
+        "change_id": change.id,
+        "job_id": job.id,
+        "status": "queued",
+        "plan_end_date": goal.plan_end_date.isoformat(),
+        "pending_new_plan_end_date": change.new_end_date.isoformat(),
+    }
 
 
 @router.post("/{goal_id}/deadline-change/{change_id}/cancel")
@@ -283,6 +312,8 @@ def deadline_cancel(
     )
     if not change:
         raise AppError("NOT_FOUND", "变更记录不存在", 404)
+    if change.status not in ("pending", "confirmed", "failed"):
+        raise AppError("NOT_FOUND", "变更记录不可取消", 404)
     change.status = "cancelled"
     db.commit()
     return {"change_id": change.id, "status": "cancelled"}

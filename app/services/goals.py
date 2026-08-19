@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
-from app.models import Goal, User
+from app.models import DeadlineChange, Goal, User
 from app.services.jobs import enqueue_job
 from app.timeutil import user_today
 
@@ -82,24 +82,44 @@ def plan_edit(
     *,
     new_plan_end_date,
     note: str | None,
-) -> tuple[Goal, int]:
+) -> tuple[Goal, int | None, int | None]:
     if goal.status not in ("active", "planning"):
         raise AppError("GOAL_NOT_ACTIVE", "当前状态不可编辑计划", 422)
     if new_plan_end_date is None and note is None:
         raise AppError("VALIDATION_ERROR", "请至少修改完成日或备注", 422)
 
     today = user_today(user.timezone)
+    change_id: int | None = None
+    job_id: int | None = None
+
     if new_plan_end_date is not None:
         if new_plan_end_date <= goal.plan_end_date:
             raise AppError("DEADLINE_NOT_LATER", "新完成日必须严格晚于当前完成日", 422)
         if new_plan_end_date < today + timedelta(days=3):
             raise AppError("DEADLINE_TOO_SOON", "新完成日须 ≥ 今天+3天", 422)
-        goal.plan_end_date = new_plan_end_date
+        change = DeadlineChange(
+            goal_id=goal.id,
+            user_id=user.id,
+            old_end_date=goal.plan_end_date,
+            new_end_date=new_plan_end_date,
+            status="confirmed",
+            confirmed_at=datetime.utcnow(),
+        )
+        db.add(change)
+        db.flush()
+        job = enqueue_job(
+            db,
+            job_type="deadline_replan",
+            user_id=user.id,
+            goal_id=goal.id,
+            deadline_change_id=change.id,
+        )
+        change_id = change.id
+        job_id = job.id
     if note is not None:
         goal.note = note
     goal.updated_at = datetime.utcnow()
-    job = enqueue_job(db, job_type="deadline_replan", user_id=user.id, goal_id=goal.id)
-    return goal, job.id
+    return goal, job_id, change_id
 
 
 def goal_list_item(goal: Goal) -> dict:

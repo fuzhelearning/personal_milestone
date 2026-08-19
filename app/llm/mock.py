@@ -86,3 +86,85 @@ def build_mock_plan(goal: Goal) -> dict:
         "day_assignments": day_assignments,
         "assumptions": ["mock-llm", "一天一事"],
     }
+
+
+def build_mock_replan(
+    context: dict,
+    goal: Goal,
+    today: date,
+    new_plan_end_date: date,
+    job_type: str,
+) -> dict:
+    """Mock 重排：延长未完成任务窗，按日排未完成任务，避开其他目标已有安排。"""
+    _ = goal, job_type
+    target = context["target_goal"]
+    incomplete = [t for t in target["tasks"] if t["progress_pct"] < 100]
+    tomorrow = today + timedelta(days=1)
+
+    if not incomplete:
+        return {
+            "task_updates": [],
+            "milestone_updates": [],
+            "day_assignments": [],
+            "assumptions": ["mock-replan", "无未完成任务"],
+        }
+
+    if tomorrow > new_plan_end_date:
+        return {
+            "task_updates": [],
+            "milestone_updates": [],
+            "day_assignments": [],
+            "suggested_deadline_change": f"建议将完成日延长至 {(tomorrow + timedelta(days=len(incomplete) - 1)).isoformat()} 或更晚",
+            "assumptions": ["mock-replan"],
+        }
+
+    occupied = {
+        d
+        for d, items in context.get("all_goals_by_date", {}).items()
+        if any(not x.get("is_target") for x in items)
+    }
+
+    task_updates = []
+    for t in incomplete:
+        t_start = date.fromisoformat(t["start_date"]) if t["start_date"] else tomorrow
+        task_updates.append(
+            {
+                "code": t["code"],
+                "start_date": max(tomorrow, t_start).isoformat(),
+                "end_date": new_plan_end_date.isoformat(),
+            }
+        )
+
+    day_assignments = []
+    cur = tomorrow
+    day_idx = 0
+    while cur <= new_plan_end_date:
+        if cur.isoformat() not in occupied:
+            t = incomplete[day_idx % len(incomplete)]
+            day_assignments.append({"date": cur.isoformat(), "task_codes": [t["code"]]})
+            day_idx += 1
+        cur += timedelta(days=1)
+
+    if len(day_assignments) < (new_plan_end_date - tomorrow).days + 1:
+        return {
+            "task_updates": task_updates,
+            "milestone_updates": [],
+            "day_assignments": day_assignments,
+            "suggested_deadline_change": (
+                f"建议将完成日延长，或调整并行目标后重试（需覆盖 {(new_plan_end_date - tomorrow).days + 1} 天）"
+            ),
+            "assumptions": ["mock-replan"],
+        }
+
+    mil_updates = []
+    for m in target["milestones"]:
+        if m["progress_pct"] >= 100:
+            continue
+        mil_updates.append({"code": m["code"], "end_date": new_plan_end_date.isoformat()})
+
+    return {
+        "task_updates": task_updates,
+        "milestone_updates": mil_updates,
+        "day_assignments": day_assignments,
+        "assumptions": ["mock-replan"],
+    }

@@ -37,8 +37,11 @@ def _parse_json_text(raw: str) -> object:
         text = "\n".join(lines).strip()
     try:
         return json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise WbsValidationError(f"非合法 JSON: {exc.msg}") from exc
+    except json.JSONDecodeError:
+        try:
+            return json.loads(text, strict=False)
+        except json.JSONDecodeError as exc:
+            raise WbsValidationError(f"非合法 JSON: {exc.msg}") from exc
 
 
 def run_wbs_generate(db: Session, goal: Goal) -> WbsGeneration:
