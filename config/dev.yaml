@@ -5,7 +5,12 @@ app_env: dev
 database_url: mysql+pymysql://root:root@127.0.0.1:3306/personal_milestone
 jwt_secret: dev-change-me
 jwt_expire_seconds: 7200
-llm_mode: mock
+llm_mode: deepseek
+llm_api_key: "sk-5811d635421b4b42a36b1592af98b9c3"
+llm_base_url: "https://api.deepseek.com"
+llm_model: "deepseek-chat"
 internal_token: dev-internal-token
 wechat_mock: true
 enable_docs: true
+# Vite 开发端口会占用后递增（5173/5174/5175…）
+cors_allow_origin_regex: "^https?://(localhost|127\\.0\\.0\\.1)(:\\d+)?$"

@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 class AppError(Exception):
     def __init__(self, code: str, message: str, http_status: int = 400, details: dict | None = None):
+        super().__init__(message)
         self.code = code
         self.message = message
         self.http_status = http_status

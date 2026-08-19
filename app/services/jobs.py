@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.errors import AppError
-from app.llm.mock import mock_replan_future_assignments, persist_suggested_generation
-from app.models import Goal, Job, User
+from app.llm.generate import run_wbs_generate
+from app.llm.replan import replan_future_assignments
+from app.models import Goal, Job, LlmCallLog, User
 from app.timeutil import user_today
 
 
 BUSY_TYPES = ("wbs_generate", "deadline_replan", "sunday_replan", "note_replan")
+LLM_RUNNING_TIMEOUT_SECONDS = 150
 
 
 def _utcnow() -> datetime:
@@ -85,25 +86,44 @@ def process_job(db: Session, job: Job) -> None:
 
 
 def _run_wbs_generate(db: Session, job: Job) -> None:
-    if get_settings().llm_mode != "mock":
-        raise AppError("LLM_FAILED", "当前仅支持 LLM_MODE=mock", 502)
     goal = db.get(Goal, job.goal_id)
     if not goal:
         raise AppError("NOT_FOUND", "目标不存在", 404)
-    gen = persist_suggested_generation(db, goal)
+    gen = run_wbs_generate(db, goal)
     job.result_ref_json = {"generation_id": gen.id}
+    if gen.status == "failed":
+        log = db.get(LlmCallLog, gen.llm_call_id) if gen.llm_call_id else None
+        detail = (log.error_message if log and log.error_message else "").strip()
+        raise AppError("LLM_FAILED", detail or "WBS 生成失败", 502)
 
 
 def _run_replan(db: Session, job: Job) -> None:
-    if get_settings().llm_mode != "mock":
-        raise AppError("LLM_FAILED", "当前仅支持 LLM_MODE=mock", 502)
     goal = db.get(Goal, job.goal_id)
     if not goal:
         raise AppError("NOT_FOUND", "目标不存在", 404)
     user = db.get(User, goal.user_id)
     today = user_today(user.timezone if user else "Asia/Shanghai")
-    n = mock_replan_future_assignments(db, goal, today)
+    n = replan_future_assignments(db, goal, today)
     job.result_ref_json = {"replanned_assignments": n}
+
+
+def sweep_stale_llm_jobs(db: Session) -> dict:
+    """将 running 超过阈值的 Job 标为 failed（llm_timeout_sweep）。"""
+    cutoff = _utcnow() - timedelta(seconds=LLM_RUNNING_TIMEOUT_SECONDS)
+    stale = list(
+        db.scalars(
+            select(Job).where(
+                Job.status == "running",
+                Job.updated_at < cutoff,
+            )
+        ).all()
+    )
+    for job in stale:
+        job.status = "failed"
+        job.error_message = f"running 超时（>{LLM_RUNNING_TIMEOUT_SECONDS}s）"
+        job.finished_at = _utcnow()
+        job.updated_at = job.finished_at
+    return {"accepted": True, "processed": len(stale), "skipped": 0}
 
 
 def get_job_for_user(db: Session, job_id: int, user_id: int) -> Job:

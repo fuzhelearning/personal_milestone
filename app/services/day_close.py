@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.llm.mock import mock_replan_future_assignments
+from app.llm.replan import replan_future_assignments
 from app.models import DayAssignment, DayEntry, Goal, JobRun, TaskNode, User
 
 
@@ -101,7 +101,7 @@ def _close_user_day(db: Session, user: User, today: date) -> None:
         _recompute_progress(db, goal)
 
         if is_sunday:
-            mock_replan_future_assignments(db, goal, today)
+            replan_future_assignments(db, goal, today)
 
 
 def _stack_assignment(db: Session, goal: Goal, task_id: int, to_date: date) -> None:

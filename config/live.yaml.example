@@ -8,6 +8,12 @@ database_url: mysql+pymysql://root:YOUR_ROOT_PASSWORD@127.0.0.1:3306/personal_mi
 jwt_secret: replace-with-long-random-secret
 jwt_expire_seconds: 7200
 llm_mode: mock
+# 真模型时改为 deepseek，并填写下列字段（勿提交真实 key）
+llm_api_key: ""
+llm_base_url: ""
+llm_model: ""
 internal_token: replace-with-long-random-internal-token
 wechat_mock: false
 enable_docs: false
+cors_origins:
+  - https://personallearnf.com.cn

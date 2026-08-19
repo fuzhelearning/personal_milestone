@@ -37,6 +37,10 @@ def _yaml_config_path(app_env: str) -> Path:
     return path
 
 
+DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
+DEFAULT_LLM_MODEL = "deepseek-chat"
+
+
 class Settings(BaseSettings):
     """取值来自 config/{APP_ENV}.yaml（可被环境变量覆盖）；此处不设业务默认值。"""
 
@@ -44,11 +48,16 @@ class Settings(BaseSettings):
     database_url: str
     jwt_secret: str
     jwt_expire_seconds: int
-    llm_mode: str  # mock | deepseek（deepseek 首期未接）
+    llm_mode: str  # mock | deepseek
+    llm_api_key: str = ""
+    llm_base_url: str = ""
+    llm_model: str = ""
     internal_token: str
     wechat_mock: bool
     # YAML 可省略；省略时按 app_env 推断
     enable_docs: bool | None = None
+    cors_origins: list[str] = Field(default_factory=list)
+    cors_allow_origin_regex: str | None = None
 
     model_config = SettingsConfigDict(
         env_file_encoding="utf-8",
@@ -96,8 +105,19 @@ class Settings(BaseSettings):
     def is_live(self) -> bool:
         return self.app_env == "live"
 
+    def resolved_llm_base_url(self) -> str:
+        return (self.llm_base_url or "").strip() or DEFAULT_LLM_BASE_URL
+
+    def resolved_llm_model(self) -> str:
+        return (self.llm_model or "").strip() or DEFAULT_LLM_MODEL
+
     def validate_for_runtime(self) -> None:
-        """live 启动硬校验；dev 不拦。"""
+        """启动硬校验：deepseek 缺 key 在任何环境都失败；live 另校弱密钥等。"""
+        mode = (self.llm_mode or "").strip().lower()
+        if mode not in ("mock", "deepseek"):
+            raise RuntimeError(f"llm_mode 必须为 mock 或 deepseek，当前: {self.llm_mode!r}")
+        if mode == "deepseek" and not (self.llm_api_key or "").strip():
+            raise RuntimeError("llm_mode=deepseek 时必须配置 llm_api_key，不能回落 mock")
         if not self.is_live:
             return
         weak_jwt = {"", "dev-change-me", "change-me", "secret"}
