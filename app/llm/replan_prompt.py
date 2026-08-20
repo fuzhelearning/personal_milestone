@@ -38,7 +38,7 @@ def build_replan_user_prompt(goal: Goal, context: dict, *, job_type: str) -> str
         return (
             f"时区今天：{context['today']}\n"
             f"目标：{json.dumps(context['goal_json'], ensure_ascii=False)}\n"
-            f"当前 active 计划（含 defer 顺延）："
+            f"当前 active 计划（含 day_close_defer/defer 顺延）："
             f"{json.dumps(context['active_plan_json'], ensure_ascii=False)}\n"
             f"未完成任务（id/title/status/remaining）：\n"
             f"{json.dumps(context['open_tasks_json'], ensure_ascii=False, indent=2)}\n"
@@ -55,7 +55,7 @@ def build_replan_user_prompt(goal: Goal, context: dict, *, job_type: str) -> str
     return (
         f"时区今天：{context['today']}\n"
         f"目标：{json.dumps(context['goal_json'], ensure_ascii=False)}\n"
-        f"当前 active 计划（含 defer 顺延）："
+        f"当前 active 计划（含 day_close_defer/defer 顺延）："
         f"{json.dumps(context['active_plan_json'], ensure_ascii=False)}\n"
         f"任务完成状态（id/title/status/remaining）：\n"
         f"{json.dumps(context['task_status_json'], ensure_ascii=False, indent=2)}\n"

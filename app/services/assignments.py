@@ -7,6 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.models import DayAssignment, DayEntry, Goal, TaskNode
 
+# 日终顺延语义：新写 day_close_defer；历史 defer 读路径同族兼容
+EXECUTION_DEFER_SOURCES = frozenset({"day_close_defer", "defer"})
+
+
+def is_execution_defer_source(source: str) -> bool:
+    return source in EXECUTION_DEFER_SOURCES
+
 
 def active_task_ids_by_goal(db: Session, goals: list[Goal]) -> dict[int, set[int]]:
     gen_ids = [g.active_wbs_generation_id for g in goals if g.active_wbs_generation_id]

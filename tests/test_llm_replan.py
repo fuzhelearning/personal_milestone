@@ -68,7 +68,11 @@ def test_build_replan_context_cross_goal_defer_remaining(db, user):
     ctx = build_replan_context(db, goal_a, user, today, end + timedelta(days=2))
     assert ctx["cross_goal_daily_load_json"]
     assert any(t["remaining_days"] >= 0 for t in ctx["task_status_json"])
-    defer_rows = [a for a in ctx["active_plan_json"]["future_assignments"] if a["source"] == "day_close_defer"]
+    defer_rows = [
+        a
+        for a in ctx["active_plan_json"]["future_assignments"]
+        if a["source"] in ("day_close_defer", "defer")
+    ]
     assert defer_rows
 
 

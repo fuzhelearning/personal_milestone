@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
 from app.models import DayAssignment, DayEntry, Goal, User
-from app.services.jobs import enqueue_job
 from app.timeutil import user_today
 
 
@@ -65,62 +64,22 @@ def uncomplete_today(db: Session, user: User, goal: Goal, task_id: int) -> dict:
 def incomplete_today(
     db: Session, user: User, goal: Goal, task_id: int, reason: str
 ) -> dict:
+    """只写当日 DayEntry；顺延留给非周日 day_close（周日 sunday_replan）。"""
     today = user_today(user.timezone)
     _get_today_assignment(db, goal, task_id, today)
     e = _get_or_create_entry(db, goal, task_id, today)
+    cleaned = (reason or "").strip()
+    if not cleaned:
+        raise AppError("ENTRY_INVALID", "请填写未完成原因", 422)
     if e.status == "done":
         raise AppError("ENTRY_INVALID", "已完成的任务请先取消勾选再标记未完成", 422)
     e.status = "not_done"
-    e.incomplete_reason = reason.strip()
+    e.incomplete_reason = cleaned
     e.updated_at = datetime.utcnow()
-
-    defer_job_id = None
-    # 非周日：经 Celery defer_stack 叠到明天；周日交给 day_close 新计划
-    if today.weekday() != 6:
-        job = enqueue_job(
-            db,
-            job_type="defer_stack",
-            user_id=user.id,
-            goal_id=goal.id,
-            result_ref_json={"task_id": task_id, "work_date": today.isoformat()},
-        )
-        defer_job_id = job.id
 
     return {
         "task_id": task_id,
         "work_date": today.isoformat(),
         "status": "not_done",
         "incomplete_reason": e.incomplete_reason,
-        "defer_job_id": defer_job_id,
     }
-
-
-def apply_defer_stack(db: Session, goal: Goal, task_id: int, work_date: date) -> date:
-    """Idempotently stack assignment onto the day after work_date. Returns target date."""
-    tomorrow = work_date + timedelta(days=1)
-    exists = db.scalar(
-        select(DayAssignment).where(
-            DayAssignment.goal_id == goal.id,
-            DayAssignment.task_id == task_id,
-            DayAssignment.plan_date == tomorrow,
-        )
-    )
-    if not exists:
-        max_sort = db.scalar(
-            select(DayAssignment.sort_order)
-            .where(DayAssignment.goal_id == goal.id, DayAssignment.plan_date == tomorrow)
-            .order_by(DayAssignment.sort_order.desc())
-            .limit(1)
-        )
-        db.add(
-            DayAssignment(
-                goal_id=goal.id,
-                user_id=goal.user_id,
-                task_id=task_id,
-                plan_date=tomorrow,
-                source="defer",
-                sort_order=(max_sort or 0) + 1,
-            )
-        )
-        db.flush()
-    return tomorrow

@@ -136,7 +136,8 @@ def process_job(db: Session, job: Job) -> None:
         elif job.type in ("deadline_replan", "sunday_replan", "note_replan"):
             _run_replan(db, job)
         elif job.type == "defer_stack":
-            _run_defer_stack(db, job)
+            # 产品路径已废止：顺延仅由 day_close 执行；误入队则失败并打日志
+            _run_defer_stack_disabled(job)
         else:
             raise ValueError(f"unknown job type: {job.type}")
         job.status = "succeeded"
@@ -150,22 +151,18 @@ def process_job(db: Session, job: Job) -> None:
         raise
 
 
-def _run_defer_stack(db: Session, job: Job) -> None:
-    from datetime import date as date_cls
+def _run_defer_stack_disabled(job: Job) -> None:
+    import logging
 
-    from app.services.today import apply_defer_stack
-
-    ref = job.result_ref_json or {}
-    task_id = ref.get("task_id")
-    work_date_raw = ref.get("work_date")
-    if not job.goal_id or task_id is None or not work_date_raw:
-        raise AppError("VALIDATION_ERROR", "defer_stack 缺少 task_id/work_date", 422)
-    goal = db.get(Goal, job.goal_id)
-    if not goal:
-        raise AppError("NOT_FOUND", "目标不存在", 404)
-    work_date = date_cls.fromisoformat(str(work_date_raw))
-    to_date = apply_defer_stack(db, goal, int(task_id), work_date)
-    job.result_ref_json = {"task_id": int(task_id), "to": to_date.isoformat(), "work_date": work_date.isoformat()}
+    logging.getLogger(__name__).warning(
+        "defer_stack job %s rejected: incomplete defer moved to day_close only",
+        job.id,
+    )
+    raise AppError(
+        "VALIDATION_ERROR",
+        "defer_stack 已停用；非周日顺延仅由 day_close 执行",
+        422,
+    )
 
 
 def _run_wbs_generate(db: Session, job: Job) -> None:

@@ -135,6 +135,7 @@ def _stack_assignment(db: Session, goal: Goal, task_id: int, to_date: date) -> N
             sort_order=0,
         )
     )
+    db.flush()
 
 
 def _recompute_progress(db: Session, goal: Goal) -> None:
