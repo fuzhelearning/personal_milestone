@@ -19,6 +19,9 @@ def _base_kwargs(**overrides):
         "llm_model": "",
         "internal_token": "dev-internal-token",
         "wechat_mock": True,
+        "celery_broker_url": "amqp://guest:guest@127.0.0.1:5672//",
+        "celery_result_backend": "",
+        "celery_task_always_eager": False,
     }
     data.update(overrides)
     return data

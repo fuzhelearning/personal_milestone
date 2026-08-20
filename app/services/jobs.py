@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
@@ -14,11 +14,55 @@ from app.timeutil import user_today
 
 
 BUSY_TYPES = ("wbs_generate", "deadline_replan", "sunday_replan", "note_replan")
-LLM_RUNNING_TIMEOUT_SECONDS = 150
+# Spec / delta: running 超过 90s → failed（timeout-sweep）
+LLM_RUNNING_TIMEOUT_SECONDS = 90
+
+_HOOK_KEY = "pm_after_commit_hooks"
 
 
 def _utcnow() -> datetime:
     return datetime.utcnow()
+
+
+@event.listens_for(Session, "after_commit")
+def _run_after_commit_hooks(session: Session) -> None:
+    hooks = session.info.pop(_HOOK_KEY, [])
+    for fn in hooks:
+        fn()
+
+
+@event.listens_for(Session, "after_rollback")
+def _clear_after_commit_hooks(session: Session) -> None:
+    session.info.pop(_HOOK_KEY, None)
+
+
+def _register_after_commit(session: Session, fn) -> None:
+    session.info.setdefault(_HOOK_KEY, []).append(fn)
+
+
+def _mark_dispatch_failed(job_id: int, error: str) -> None:
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        job = db.get(Job, job_id)
+        if job and job.status == "queued":
+            job.status = "failed"
+            job.error_message = error
+            job.finished_at = _utcnow()
+            job.updated_at = job.finished_at
+            db.commit()
+    finally:
+        db.close()
+
+
+def _dispatch_job_to_celery(job_id: int) -> None:
+    try:
+        from app.celery_app import process_job_task
+
+        process_job_task.delay(job_id)
+    except Exception as exc:  # noqa: BLE001
+        _mark_dispatch_failed(job_id, f"celery dispatch failed: {exc}")
 
 
 def assert_goal_not_busy(db: Session, goal_id: int) -> None:
@@ -39,9 +83,17 @@ def enqueue_job(
     job_type: str,
     user_id: int | None,
     goal_id: int | None,
-    process_now: bool = True,
+    process_now: bool | None = None,
     deadline_change_id: int | None = None,
+    result_ref_json: dict | None = None,
 ) -> Job:
+    """Create Job(queued). Production: after_commit → Celery delay (T2).
+
+    process_now=True: run inline in this session (unit tests / escape hatch).
+    process_now=None: use settings.celery_task_always_eager for inline, else T2.
+    """
+    from app.config import get_settings
+
     if goal_id and job_type in BUSY_TYPES:
         assert_goal_not_busy(db, goal_id)
     job = Job(
@@ -49,6 +101,7 @@ def enqueue_job(
         goal_id=goal_id,
         type=job_type,
         status="queued",
+        result_ref_json=result_ref_json,
     )
     db.add(job)
     db.flush()
@@ -57,14 +110,19 @@ def enqueue_job(
         if change:
             change.job_id = job.id
             db.flush()
-    if process_now:
+
+    inline = process_now if process_now is not None else get_settings().celery_task_always_eager
+    if inline:
         try:
             process_job(db, job)
         except AppError:
-            # job 已标记 failed，接口仍可返回 job_id 供轮询
             pass
         except Exception:
             pass
+        return job
+
+    job_id = job.id
+    _register_after_commit(db, lambda: _dispatch_job_to_celery(job_id))
     return job
 
 
@@ -78,7 +136,7 @@ def process_job(db: Session, job: Job) -> None:
         elif job.type in ("deadline_replan", "sunday_replan", "note_replan"):
             _run_replan(db, job)
         elif job.type == "defer_stack":
-            job.result_ref_json = {"deferred": True}
+            _run_defer_stack(db, job)
         else:
             raise ValueError(f"unknown job type: {job.type}")
         job.status = "succeeded"
@@ -90,6 +148,24 @@ def process_job(db: Session, job: Job) -> None:
         job.finished_at = _utcnow()
         job.updated_at = job.finished_at
         raise
+
+
+def _run_defer_stack(db: Session, job: Job) -> None:
+    from datetime import date as date_cls
+
+    from app.services.today import apply_defer_stack
+
+    ref = job.result_ref_json or {}
+    task_id = ref.get("task_id")
+    work_date_raw = ref.get("work_date")
+    if not job.goal_id or task_id is None or not work_date_raw:
+        raise AppError("VALIDATION_ERROR", "defer_stack 缺少 task_id/work_date", 422)
+    goal = db.get(Goal, job.goal_id)
+    if not goal:
+        raise AppError("NOT_FOUND", "目标不存在", 404)
+    work_date = date_cls.fromisoformat(str(work_date_raw))
+    to_date = apply_defer_stack(db, goal, int(task_id), work_date)
+    job.result_ref_json = {"task_id": int(task_id), "to": to_date.isoformat(), "work_date": work_date.isoformat()}
 
 
 def _run_wbs_generate(db: Session, job: Job) -> None:

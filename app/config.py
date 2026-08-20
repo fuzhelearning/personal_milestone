@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     llm_model: str = ""
     internal_token: str
     wechat_mock: bool
+    celery_broker_url: str
+    celery_result_backend: str = ""
+    celery_task_always_eager: bool = False
     # YAML 可省略；省略时按 app_env 推断
     enable_docs: bool | None = None
     cors_origins: list[str] = Field(default_factory=list)

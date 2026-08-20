@@ -10,7 +10,8 @@
 |--|-------|--------|
 | 应用配置 | `config/dev.yaml` | `config/live.yaml`（由 `live.yaml.example` 复制） |
 | Compose | `docker-compose.yml` + `docker-compose.dev.yml` | `docker-compose.yml` + `docker-compose.live.yml` |
-| 数据库 | MySQL 8.4（开发口令） | MySQL 8.0 容器 `personal_db` |
+| 数据库 | MySQL 8.4（开发口令 root/root） | MySQL 8.0 容器 `personal_db` |
+| 队列 | RabbitMQ + Celery worker/beat（compose 内） | 同左，独立于 uvicorn |
 | 微信登录 | `wechat_mock: true` | 禁止 mock |
 | Secrets | 可用占位值 | 启动时校验，弱密钥会拒绝启动 |
 | `/docs` | 默认开 | 默认关 |
@@ -23,20 +24,22 @@
 ```bash
 cd /Users/fuzhe/personal_milestone
 
-# 1) 本地 MySQL（需 Docker Desktop；若 brew MySQL 占 3306：brew services stop mysql）
+# 1) MySQL + RabbitMQ + Celery worker/beat（需 Docker Desktop）
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 APP_ENV=dev alembic upgrade head
+# API 与 worker/beat 分离：uvicorn 在宿主机；异步 Job 由 compose 内 worker 消费
 APP_ENV=dev uvicorn main:app --reload --port 8000
 ```
 
 - 健康检查：`GET http://127.0.0.1:8000/health`（含 `app_env`）
 - OpenAPI：`http://127.0.0.1:8000/docs`
 - 微信登录：任意 `code` 即可签发 JWT
-- 默认连接见 `config/dev.yaml` → `database_url`
+- 默认连接见 `config/dev.yaml` → `database_url` / `celery_broker_url`
+- Beat：`day-close` 每天 Asia/Shanghai 23:50；`timeout-sweep` 每 5 分钟
 - 表结构由 Alembic 管理（`alembic/versions/`），**不要**再依赖启动时 `create_all`
 
 ### Compose 命令
@@ -44,9 +47,9 @@ APP_ENV=dev uvicorn main:app --reload --port 8000
 ```bash
 # 本地
 alias dc-dev='docker compose -f docker-compose.yml -f docker-compose.dev.yml'
-dc-dev up -d          # 启动
+dc-dev up -d          # 启动 mysql + rabbitmq + worker + beat
 dc-dev ps             # 状态
-dc-dev logs -f mysql  # 日志
+dc-dev logs -f worker # worker 日志
 dc-dev down           # 停止（保留数据卷）
 
 # 线上
@@ -57,8 +60,9 @@ dc-live up -d
 | | 本地 `dev` | 线上 `live` |
 |--|------------|-------------|
 | 项目名 | `personal_milestone_dev` | `personal_milestone_live` |
-| 镜像 | `mysql:8.4`（DaoCloud） | `mysql:8.0` |
-| 容器名 | `personal_milestone_mysql_dev` | `personal_db` |
+| MySQL | `mysql:8.4` / `personal_milestone_mysql_dev` | `mysql:8.0` / `personal_db` |
+| RabbitMQ | `5672` / 管理台 `15672` | 同左 |
+| Celery | `worker` + `beat` 容器 | 同左 |
 | 端口 | `3306:3306` | `3306:3306` |
 | root 密码 | `root` | 启动前 `export MYSQL_ROOT_PASSWORD=...` |
 | 数据卷 | `mysql_data` | `mysql_data` |
@@ -103,12 +107,12 @@ APP_ENV=dev python scripts/smoke_test.py
 典型 API 顺序：
 
 1. `POST /api/v1/auth/wechat/login` `{ "code": "dev" }`
-2. `POST /api/v1/goals` → 202 + `job_id`（mock 同步写入 suggested WBS）
-3. `GET /api/v1/jobs/{job_id}` → `result_ref.generation_id`
+2. `POST /api/v1/goals` → 202 + `job_id`（Celery worker 异步写 suggested WBS）
+3. `GET /api/v1/jobs/{job_id}` → 轮询至 `succeeded`，读 `result_ref.generation_id`
 4. `POST .../wbs/generations/{id}/confirm`
 5. `GET /api/v1/home` / `GET /api/v1/gantt`
 6. `POST .../today-tasks/{task_id}/complete|incomplete`
-7. 日终：`POST /internal/jobs/day-close/run` + 头 `X-Internal-Token`
+7. 日终补跑（可选）：`POST /internal/jobs/day-close/run` + 头 `X-Internal-Token`（生产主路径为 Celery Beat）
 
 ## 配置项（`config/{dev,live}.yaml`）
 
@@ -116,6 +120,9 @@ APP_ENV=dev python scripts/smoke_test.py
 |------|------------|-----------|
 | `app_env` | `dev` | `live` |
 | `database_url` | `mysql+pymysql://root:root@127.0.0.1:3306/personal_milestone` | MySQL，禁止 SQLite |
+| `celery_broker_url` | `amqp://guest:guest@127.0.0.1:5672//` | RabbitMQ，禁止 Redis/DB broker |
+| `celery_result_backend` | `""`（关闭） | 可选；客户端不依赖 |
+| `celery_task_always_eager` | `false` | `false` |
 | `llm_mode` | `mock` | 首期可 `mock`；接模型后 `deepseek` |
 | `wechat_mock` | `true` | 必须 `false` |
 | `jwt_secret` | 占位即可 | ≥16 且非占位 |

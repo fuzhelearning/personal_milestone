@@ -11,6 +11,9 @@ llm_base_url: "https://api.deepseek.com"
 llm_model: "deepseek-chat"
 internal_token: dev-internal-token
 wechat_mock: true
+celery_broker_url: amqp://guest:guest@127.0.0.1:5672//
+celery_result_backend: ""
+celery_task_always_eager: false
 enable_docs: true
 # Vite 开发端口会占用后递增（5173/5174/5175…）
 cors_allow_origin_regex: "^https?://(localhost|127\\.0\\.0\\.1)(:\\d+)?$"

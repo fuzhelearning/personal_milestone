@@ -14,6 +14,9 @@ llm_base_url: ""
 llm_model: ""
 internal_token: replace-with-long-random-internal-token
 wechat_mock: false
+celery_broker_url: amqp://guest:guest@127.0.0.1:5672//
+celery_result_backend: ""
+celery_task_always_eager: false
 enable_docs: false
 cors_origins:
   - https://personallearnf.com.cn

@@ -141,7 +141,7 @@ def regenerate_wbs(
     job = enqueue_job(db, job_type="wbs_generate", user_id=user.id, goal_id=goal.id)
     db.commit()
     response.status_code = 202
-    gen_id = (job.result_ref_json or {}).get("generation_id")
+    gen_id = (job.result_ref_json or {}).get("generation_id") if job.result_ref_json else None
     return {"generation_id": gen_id, "job_id": job.id, "status": job.status}
 
 

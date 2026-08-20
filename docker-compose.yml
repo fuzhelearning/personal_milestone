@@ -12,5 +12,18 @@ services:
       retries: 20
       start_period: 20s
 
+  rabbitmq:
+    # 国内直连 Docker Hub 常超时；DaoCloud 代理官方 library 镜像
+    image: docker.m.daocloud.io/library/rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
 volumes:
   mysql_data:

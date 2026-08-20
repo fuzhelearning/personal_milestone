@@ -338,6 +338,7 @@ def test_enqueue_deadline_replan_links_change(db, user):
             user_id=user.id,
             goal_id=goal.id,
             deadline_change_id=change.id,
+            process_now=True,
         )
 
     db.refresh(change)

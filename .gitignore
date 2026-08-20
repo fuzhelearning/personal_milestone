@@ -5,3 +5,5 @@ config/live.yaml
 .idea/
 *.db
 .DS_Store
+celerybeat-schedule
+celerybeat-schedule.*

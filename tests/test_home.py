@@ -29,14 +29,19 @@ def test_home_excludes_suggested_replan_assignments(db, user):
     )
     db.commit()
 
-    with patch("app.llm.replan_run.get_settings", return_value=_mock_settings()):
+    with (
+        patch("app.llm.replan_run.get_settings", return_value=_mock_settings()),
+        patch("app.services.home.user_today", return_value=today),
+        patch("app.timeutil.user_today", return_value=today),
+    ):
         enqueue_job(
             db,
             job_type="deadline_replan",
             user_id=user.id,
             goal_id=goal.id,
+            process_now=True,
         )
 
-    home = build_home(db, user)
+        home = build_home(db, user)
     day2_titles = [t["title"] for t in home["today_tasks"] if t["goal_id"] == goal.id]
     assert len(day2_titles) == 1

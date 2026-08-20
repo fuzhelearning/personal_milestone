@@ -1,11 +1,8 @@
-# 线上环境 —— 对齐现有 docker run：
-#   docker run -d --name personal_db -p 3306:3306 \
-#     -e MYSQL_ROOT_PASSWORD=... -v mysql_data:/var/lib/mysql \
-#     --restart always mysql:8.0
-#
-# 用法：
+# 线上环境 —— 用法：
 #   export MYSQL_ROOT_PASSWORD='你的密码'
 #   docker compose -f docker-compose.yml -f docker-compose.live.yml up -d
+#
+# uvicorn / worker / beat 分离；broker 为 RabbitMQ。
 
 name: personal_milestone_live
 
@@ -20,3 +17,47 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?export MYSQL_ROOT_PASSWORD first}
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+
+  rabbitmq:
+    container_name: personal_milestone_rabbitmq_live
+    restart: always
+
+  worker:
+    build: .
+    container_name: personal_milestone_worker_live
+    restart: always
+    command: celery -A app.celery_app.celery worker --loglevel=info
+    environment:
+      APP_ENV: live
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@host.docker.internal:3306/personal_milestone
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+    volumes:
+      - .:/app
+      - ./config/live.yaml:/app/config/live.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  beat:
+    build: .
+    container_name: personal_milestone_beat_live
+    restart: always
+    command: celery -A app.celery_app.celery beat --loglevel=info
+    environment:
+      APP_ENV: live
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@host.docker.internal:3306/personal_milestone
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+    volumes:
+      - .:/app
+      - ./config/live.yaml:/app/config/live.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy

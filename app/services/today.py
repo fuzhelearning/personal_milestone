@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
-from app.models import DayAssignment, DayEntry, Goal, Job, User
+from app.models import DayAssignment, DayEntry, Goal, User
+from app.services.jobs import enqueue_job
 from app.timeutil import user_today
 
 
@@ -74,9 +75,16 @@ def incomplete_today(
     e.updated_at = datetime.utcnow()
 
     defer_job_id = None
-    # 非周日：立刻叠到明天（ADR-0015）；周日交给 day_close 新计划
+    # 非周日：经 Celery defer_stack 叠到明天；周日交给 day_close 新计划
     if today.weekday() != 6:
-        defer_job_id = _stack_to_tomorrow(db, goal, task_id, today)
+        job = enqueue_job(
+            db,
+            job_type="defer_stack",
+            user_id=user.id,
+            goal_id=goal.id,
+            result_ref_json={"task_id": task_id, "work_date": today.isoformat()},
+        )
+        defer_job_id = job.id
 
     return {
         "task_id": task_id,
@@ -87,8 +95,9 @@ def incomplete_today(
     }
 
 
-def _stack_to_tomorrow(db: Session, goal: Goal, task_id: int, today) -> int:
-    tomorrow = today + timedelta(days=1)
+def apply_defer_stack(db: Session, goal: Goal, task_id: int, work_date: date) -> date:
+    """Idempotently stack assignment onto the day after work_date. Returns target date."""
+    tomorrow = work_date + timedelta(days=1)
     exists = db.scalar(
         select(DayAssignment).where(
             DayAssignment.goal_id == goal.id,
@@ -113,14 +122,5 @@ def _stack_to_tomorrow(db: Session, goal: Goal, task_id: int, today) -> int:
                 sort_order=(max_sort or 0) + 1,
             )
         )
-    job = Job(
-        user_id=goal.user_id,
-        goal_id=goal.id,
-        type="defer_stack",
-        status="succeeded",
-        result_ref_json={"task_id": task_id, "to": tomorrow.isoformat()},
-        finished_at=datetime.utcnow(),
-    )
-    db.add(job)
-    db.flush()
-    return job.id
+        db.flush()
+    return tomorrow

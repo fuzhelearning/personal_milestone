@@ -1,13 +1,62 @@
+# 本地开发 —— 用法：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# MySQL 默认 root/root（与 config/dev.yaml 对齐）。uvicorn 仍在宿主机跑；
+# worker/beat 在 compose 内，经 host.docker.internal 访问宿主机 MySQL。
+
 name: personal_milestone_dev
 
 services:
   mysql:
-    image: mysql:8.0
-    container_name: personal_db
-    restart: always
+    image: docker.m.daocloud.io/library/mysql:8.4
+    container_name: personal_milestone_mysql_dev
+    restart: unless-stopped
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?export MYSQL_ROOT_PASSWORD first}
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: personal_milestone
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+
+  rabbitmq:
+    container_name: personal_milestone_rabbitmq_dev
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: personal_milestone_worker_dev
+    restart: unless-stopped
+    command: celery -A app.celery_app.celery worker --loglevel=info
+    environment:
+      APP_ENV: dev
+      DATABASE_URL: mysql+pymysql://root:root@host.docker.internal:3306/personal_milestone
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+    volumes:
+      - .:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  beat:
+    build: .
+    container_name: personal_milestone_beat_dev
+    restart: unless-stopped
+    command: celery -A app.celery_app.celery beat --loglevel=info
+    environment:
+      APP_ENV: dev
+      DATABASE_URL: mysql+pymysql://root:root@host.docker.internal:3306/personal_milestone
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+    volumes:
+      - .:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
